@@ -2,6 +2,7 @@ package com.si_ware.neospectra.Activities;
 
 import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
@@ -74,10 +75,10 @@ public class MainActivity extends NavDrawerActivity implements
 
     /* To prevent user from asking for the same process twice*/
     private boolean isWaitingForSensorReading = false;
-    private boolean isStopEnabled= false;
+    private boolean isStopEnabled = false;
     private boolean isWaitingForBackGroundReading = false;
 
-    public  int backgroundScanTime = 2;
+    public int backgroundScanTime = 2;
     ScanPresenter scanPresenter;
 
     public static boolean error_sensor_reading = false;
@@ -92,7 +93,7 @@ public class MainActivity extends NavDrawerActivity implements
     private TextView tv_progressCount;
     private TextView textScan;
     private int notifications_count = 0;
-    private int count =1;
+    private int count = 1;
     private ProgressBar pbProgressBar;
 
 
@@ -111,6 +112,12 @@ public class MainActivity extends NavDrawerActivity implements
         // Create new instance from bluetoothApi if it null
         if (bluetoothAPI == null) {
             bluetoothAPI = new SWS_P3API(this, mContext);
+        }
+        if(bluetoothAPI != null)
+        {
+            bluetoothAPI.setHomeContext(this.mContext);
+            bluetoothAPI.sendMemoryRequest();
+            bluetoothAPI.sendBatRequest();
         }
 
         mContext = this;
@@ -141,9 +148,8 @@ public class MainActivity extends NavDrawerActivity implements
         tv_progressValue = findViewById(R.id.tv_progress);
         tv_progressValue.setText("" + scanTime);
         // Adjust progress value if scan time changed from its default value
-        if(scanTime !=2)
-        {
-            tv_progressValue.setX(progressBarPosition/2);
+        if (scanTime != 2) {
+            tv_progressValue.setX(progressBarPosition / 2);
         }
 
         pbProgressBar = findViewById(R.id.progressBarMain);
@@ -168,10 +174,9 @@ public class MainActivity extends NavDrawerActivity implements
 
         // This is the listener of scan button
         btnScan.setOnClickListener(v -> {
-            if (textScan.getText()=="Scan") {
+            if (textScan.getText() == "Scan") {
 
-                if(backgroundScanTime < scanTime)
-                {
+                if (backgroundScanTime < scanTime) {
                     logMessage(TAG, "Material Scan time is greater than reference material scan time ");
                     showAlertMessage(mContext, "Error", "Material scan time should be less than or equal reference scan time");
                     return;
@@ -183,12 +188,12 @@ public class MainActivity extends NavDrawerActivity implements
                 textScan.setText("Stop");
                 btnBackground.setBackgroundTintList(ContextCompat.getColorStateList(mContext, R.color.Button_Disabled));
                 btnBackground.setEnabled(false);
-                if(Double.parseDouble(tx_numberOfRuns.getText().toString()) > 1) {
+                if (Double.parseDouble(tx_numberOfRuns.getText().toString()) > 1) {
                     tv_progressCount.setEnabled(true);
                     pbProgressBar.setVisibility(View.VISIBLE);
                     rotateProgressBar(mContext, pbProgressBar);
                 }
-                if(count == 1)
+                if (count == 1)
                     tv_progressCount.setText("1/" + tx_numberOfRuns.getText().toString());
                 tv_progressCount.setTextColor(Color.BLACK);
 
@@ -214,22 +219,22 @@ public class MainActivity extends NavDrawerActivity implements
         // This is the listener of background reading request
         btnBackground.setOnClickListener(v -> {
 
-                btnScan.setBackgroundTintList(ContextCompat.getColorStateList(mContext, R.color.Button_Disabled));
-                btnScan.setEnabled(false);
-                btnViewScan.setBackgroundTintList(ContextCompat.getColorStateList(mContext, R.color.Button_Disabled));
-                btnViewScan.setEnabled(false);
-                isScanBG = true;
-                btnBackground.setBackgroundTintList(ContextCompat.getColorStateList(mContext, R.color.Button_Disabled));
-                btnBackground.setEnabled(false);
-                tv_progressCount.setEnabled(false);
-                tv_progressCount.setText("");
-                backgroundScanTime = scanTime;
-                pbProgressBar.setVisibility(View.INVISIBLE);
+            btnScan.setBackgroundTintList(ContextCompat.getColorStateList(mContext, R.color.Button_Disabled));
+            btnScan.setEnabled(false);
+            btnViewScan.setBackgroundTintList(ContextCompat.getColorStateList(mContext, R.color.Button_Disabled));
+            btnViewScan.setEnabled(false);
+            isScanBG = true;
+            btnBackground.setBackgroundTintList(ContextCompat.getColorStateList(mContext, R.color.Button_Disabled));
+            btnBackground.setEnabled(false);
+            tv_progressCount.setEnabled(false);
+            tv_progressCount.setText("");
+            backgroundScanTime = scanTime;
+            pbProgressBar.setVisibility(View.INVISIBLE);
 
-                // Request background reading from device
-                sendBackgroundCommand();
+            // Request background reading from device
+            sendBackgroundCommand();
 
-                });
+        });
 
         // This is the scan time seekBar listener
         mSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
@@ -242,7 +247,7 @@ public class MainActivity extends NavDrawerActivity implements
                 }
                 // Update scan time
                 scanTime = progress;
-                int val = (int)((double)(progress * (seekBar.getWidth() - 2 * seekBar.getThumbOffset())) / (double)(seekBar.getMax()* 1.15));
+                int val = (int) ((double) (progress * (seekBar.getWidth() - 2 * seekBar.getThumbOffset())) / (double) (seekBar.getMax() * 1.15));
                 tv_progressValue.setText("" + progress);
                 progressBarPosition = seekBar.getX() + val + seekBar.getThumbOffset() / 2;
 
@@ -265,9 +270,9 @@ public class MainActivity extends NavDrawerActivity implements
 
         //Start Results Activity
         btnViewScan.setOnClickListener(v -> {
-            measurmentsViewCaller = MainActivity.class;
-            Intent intent = new Intent(this, ResultsActivity.class);
-            startActivity(intent);
+                    measurmentsViewCaller = MainActivity.class;
+                    Intent intent = new Intent(this, ResultsActivity.class);
+                    startActivity(intent);
                 }
 
         );
@@ -275,8 +280,7 @@ public class MainActivity extends NavDrawerActivity implements
 
     }
 
-    private void updateProgressValue(int value)
-    {
+    private void updateProgressValue(int value) {
         String[] strings = tv_progressCount.getText().toString().split("/");
 
         strings[0] = String.valueOf(value);
@@ -289,8 +293,29 @@ public class MainActivity extends NavDrawerActivity implements
     @Override
     public void onBackPressed() {
 
-        Intent iMain = new Intent(this, HomeActivity.class);
-        startActivity(iMain);
+        android.support.v7.app.AlertDialog.Builder myAlert = new android.support.v7.app.AlertDialog
+                .Builder(mContext);
+        myAlert.setTitle("Disconnect");
+        myAlert.setMessage("Are you sure you want to disconnect the device?");
+        myAlert.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(@NonNull DialogInterface dialogInterface, int i) {
+                dialogInterface.dismiss();
+                if (bluetoothAPI != null) bluetoothAPI.disconnectFromDevice();
+                Intent iMain = new Intent(mContext, ConnectActivity.class);
+                iMain.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                startActivity(iMain);
+            }
+        });
+
+        myAlert.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(@NonNull DialogInterface dialogInterface, int i) {
+                dialogInterface.dismiss();
+            }
+        });
+
+        myAlert.show();
     }
 
     @Override
@@ -306,7 +331,7 @@ public class MainActivity extends NavDrawerActivity implements
         LocalBroadcastManager.getInstance(this).registerReceiver(mMessageReceiver,
                 new IntentFilter(GlobalVariables.INTENT_ACTION));
 
-        if(bluetoothAPI != null) {
+        if (bluetoothAPI != null) {
             if (!bluetoothAPI.isDeviceConnected()) {
                 endActivity();
                 return;
@@ -392,15 +417,10 @@ public class MainActivity extends NavDrawerActivity implements
     }
 
 
-
-
-
     @Override
     public File getFileStreamPath(String name) {
         return super.getFileStreamPath(name);
     }
-
-
 
 
     // Handling receiving data from sensor
@@ -479,7 +499,7 @@ public class MainActivity extends NavDrawerActivity implements
             Double numberOfRuns = Double.parseDouble(tx_numberOfRuns.getText().toString());
 
             // Enable Stop action button in case there are a multiple number of runs
-            if( count< numberOfRuns) {
+            if (count < numberOfRuns) {
                 if (isStopEnabled) {
                     count = 1;
                     tv_progressCount.setEnabled(false);
@@ -502,8 +522,7 @@ public class MainActivity extends NavDrawerActivity implements
                 updateProgressValue(count);
                 // Press scan button again as it is a continues mode
                 btnScan.performClick();
-            }
-            else// Handle only one run
+            } else// Handle only one run
             {
                 tv_progressCount.setEnabled(false);
                 tv_progressCount.setText("");
@@ -519,7 +538,7 @@ public class MainActivity extends NavDrawerActivity implements
                 btnBackground.setEnabled(true);
                 textScan.setText("Scan");
                 count = 1;
-                Toast.makeText(getApplicationContext(),"Scan is complete", Toast.LENGTH_LONG).show();
+                Toast.makeText(getApplicationContext(), "Scan is complete", Toast.LENGTH_LONG).show();
             }
         }
 
@@ -605,12 +624,11 @@ public class MainActivity extends NavDrawerActivity implements
         scanPresenter.requestBackgroundReading(mSeekBar.getProgress());
     }
 
-    private void endActivity()
-    {
+    private void endActivity() {
         bluetoothAPI = null;
         Intent mIntent = new Intent(MainActivity.this, ConnectActivity.class);
         startActivity(mIntent);
     }
-    
+
 
 }

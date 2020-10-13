@@ -96,9 +96,9 @@ public class MainPage extends AppCompatActivity implements BottomNavigationView.
 //        gCorrectionMode = preferences.getString("wavelength_correction", GlobalVariables.wavelengthCorrection.Self_Calibration.toString());
 
 
-        ArrayAdapter<CharSequence> bluetoothSpinnerAdapter = ArrayAdapter.createFromResource(mContext,
-                R.array.BLE_Services, android.R.layout.simple_spinner_item);
-        bluetoothSpinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+//        ArrayAdapter<CharSequence> bluetoothSpinnerAdapter = ArrayAdapter.createFromResource(mContext,
+//                R.array.BLE_Services, android.R.layout.simple_spinner_item);
+//        bluetoothSpinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
     }
 
     private boolean loadFragment(Fragment fragment) {

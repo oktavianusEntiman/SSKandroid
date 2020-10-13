@@ -3,6 +3,7 @@ package com.si_ware.neospectra.Activities.Interfaces.ExportPage;
 import android.Manifest;
 import android.app.DatePickerDialog;
 import android.app.Dialog;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
@@ -34,7 +35,9 @@ import android.widget.LinearLayout;
 import android.widget.PopupMenu;
 import android.widget.Toast;
 
+import com.si_ware.neospectra.Activities.IntroActivity;
 import com.si_ware.neospectra.Activities.SettingsActivity;
+import com.si_ware.neospectra.BluetoothSDK.SWS_P3API;
 import com.si_ware.neospectra.R;
 import com.si_ware.neospectra.dbtable.Constants;
 import com.si_ware.neospectra.dbtable.DBAdapter;
@@ -55,9 +58,12 @@ import de.codecrafters.tableview.toolkit.SimpleTableDataAdapter;
 import de.codecrafters.tableview.toolkit.SimpleTableHeaderAdapter;
 import de.codecrafters.tableview.toolkit.TableDataRowBackgroundProviders;
 
+import static com.si_ware.neospectra.Global.GlobalVariables.bluetoothAPI;
 import static java.util.Calendar.YEAR;
 
 public class ExportPageFragment extends Fragment {
+
+    private Context mContext;
 
     EditText edtDate, edtTanggal, edtSeacrh;
     Calendar myCalendar, myCalendar2;
@@ -91,6 +97,12 @@ public class ExportPageFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
+
+        if (bluetoothAPI == null) {
+            bluetoothAPI = new SWS_P3API(getActivity(), mContext);
+        }
+        mContext = getActivity();
+
         final Drawable upArrow = getResources().getDrawable(R.drawable.ic_keyboard_arrow_left);
 
         Toolbar toolbar = view.findViewById(R.id.titlebar);
@@ -307,9 +319,8 @@ public class ExportPageFragment extends Fragment {
 //                Toast.makeText(getActivity(), ((String[]) clickedData)[0], Toast.LENGTH_SHORT).show();
 //                dbHelper.deleteData(clickedData);
 
-                    dbHelper.deleteData(((String)clickedData));
+                dbHelper.deleteData(((String) clickedData));
                 Toast.makeText(getActivity(), "Data dihapus ", Toast.LENGTH_SHORT).show();
-
 
 //                Integer hapusBaris = db.deleteData(edtBray.getText().toString());
 //                if (hapusBaris > 0 ) {
@@ -440,34 +451,31 @@ public class ExportPageFragment extends Fragment {
         saveBtn = (Button) d.findViewById(R.id.saveBtn);
 
         //SAVE
-        saveBtn.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
+        saveBtn.setOnClickListener(v -> {
 
-                Spacecraft s = new Spacecraft();
+            Spacecraft s = new Spacecraft();
 
 //                s.setId(edtId.get);
-                s.setBray(edtBray.getText().toString());
-                s.setCa(edtCa.getText().toString());
-                s.setClay(edtClay.getText().toString());
-                s.setCn(edtCn.getText().toString());
-                s.setHcl(edtHcl.getText().toString());
+            s.setBray(edtBray.getText().toString());
+            s.setCa(edtCa.getText().toString());
+            s.setClay(edtClay.getText().toString());
+            s.setCn(edtCn.getText().toString());
+            s.setHcl(edtHcl.getText().toString());
 //                s.setP2o5(edtP2o5.getText().toString());
 
-                if (new DBAdapter(getActivity()).saveSpacecraft(s)) {
-                    edtBray.setText("");
-                    edtCa.setText("");
-                    edtClay.setText("");
-                    edtCn.setText("");
-                    edtHcl.setText("");
+            if (new DBAdapter(getActivity()).saveSpacecraft(s)) {
+                edtBray.setText("");
+                edtCa.setText("");
+                edtClay.setText("");
+                edtCn.setText("");
+                edtHcl.setText("");
 //                    edtP2o5.setText("");
 
 
-                    tb.setDataAdapter(new SimpleTableDataAdapter(getActivity(), tableHelper.getSpaceProbes()));
-                    Toast.makeText(getActivity(), "Saved", Toast.LENGTH_SHORT).show();
-                } else {
-                    Toast.makeText(getActivity(), "Not Saved", Toast.LENGTH_SHORT).show();
-                }
+                tb.setDataAdapter(new SimpleTableDataAdapter(getActivity(), tableHelper.getSpaceProbes()));
+                Toast.makeText(getActivity(), "Saved", Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(getActivity(), "Not Saved", Toast.LENGTH_SHORT).show();
             }
         });
 
@@ -492,73 +500,89 @@ public class ExportPageFragment extends Fragment {
     }
 
 
-    @Override
-    public void onCreate(@Nullable Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setHasOptionsMenu(true);
-    }
-
-    @Override
-    public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
-        inflater.inflate(R.menu.menu_export, menu);
-        super.onCreateOptionsMenu(menu, inflater);
-    }
-
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        if (item.getItemId() == android.R.id.home) {
-            Intent intent = new Intent(getActivity(), SettingsActivity.class);
-            startActivity(intent);
-        }
-        if (item.getItemId() == R.id.share) {
-            try {
-                String filelocation = Environment.getExternalStorageDirectory().getPath() + "/Neospectra/NEO.csv";
-                Intent intent = new Intent(Intent.ACTION_SENDTO);
-                intent.setType("text/plain");
-                String message = "File to be shared is .";
-                intent.putExtra(Intent.EXTRA_SUBJECT, "Students REPORT");
-                intent.putExtra(Intent.EXTRA_STREAM, Uri.parse("file://" + filelocation));
-                intent.putExtra(Intent.EXTRA_TEXT, message);
-                intent.setData(Uri.parse("kaisarfajaroktavinusentiman@gmail.com"));   //insert your email address("mailto:csent.company@gmail.com")
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                startActivity(intent);
-
-                Toast.makeText(getActivity(), "Berhasil", Toast.LENGTH_SHORT).show();
-            } catch (Exception e) {
-                System.out.println("is exception raises during sending mail" + e);
-                Log.e("Erorr : ", String.valueOf(e));
-                Toast.makeText(getActivity(), "Error : " + String.valueOf(e), Toast.LENGTH_SHORT).show();
-            }
-        }
-        if (item.getItemId() == R.id.export_data) {
-            final BottomSheetDialog bottomSheetDialog = new BottomSheetDialog(getActivity());
-            bottomSheetDialog.setContentView(R.layout.bottom_sheet_dialog);
-
-            bottomSheetDialog.setCanceledOnTouchOutside(false);
-
-            LinearLayout bottom_sheet_refresh = bottomSheetDialog.findViewById(R.id.bottom_sheet_export);
-            bottom_sheet_refresh.setVisibility(View.VISIBLE);
-            CardView btn_yes = bottomSheetDialog.findViewById(R.id.btn_yes3);
-            CardView btn_cancel = bottomSheetDialog.findViewById(R.id.btn_cancel3);
-
-            btn_yes.setOnClickListener(v -> {
-
-                if (checkStoragePermission()) {
-                    //permission allowed
-                    exportCSV();
-                } else {
-                    requestStoragePermissionExport();
-                }
-            });
-
-            btn_cancel.setOnClickListener(view -> bottomSheetDialog.hide());
-
-            bottomSheetDialog.show();
-
-        }
-        if (item.getItemId() == R.id.delete) {
-            Toast.makeText(getActivity(), "Delete Action", Toast.LENGTH_SHORT).show();
-        }
-        return super.onOptionsItemSelected(item);
-    }
 }
+//@Override
+//    public void onCreate(@Nullable Bundle savedInstanceState) {
+//        super.onCreate(savedInstanceState);
+//        setHasOptionsMenu(true);
+//    }
+//
+//    @Override
+//    public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
+//        inflater.inflate(R.menu.menu_export, menu);
+//        super.onCreateOptionsMenu(menu, inflater);
+//    }
+//
+//    @Override
+//    public boolean onOptionsItemSelected(MenuItem item) {
+//        if (item.getItemId() == android.R.id.home) {
+//            android.support.v7.app.AlertDialog.Builder myAlert = new android.support.v7.app.AlertDialog
+//                    .Builder(mContext);
+//            myAlert.setTitle("Disconnect");
+//            myAlert.setMessage("Are you sure you want to disconnect the device?");
+//            myAlert.setPositiveButton("OK", (dialogInterface, i) -> {
+//                dialogInterface.dismiss();
+//                // Request of bluetooth disconnection
+//                if (bluetoothAPI != null) {
+//                    bluetoothAPI.disconnectFromDevice();
+//
+//                    Intent iMain = new Intent(mContext, IntroActivity.class);
+//                    iMain.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+//                    startActivity(iMain);
+//                }
+//
+//            });
+//            myAlert.setNegativeButton("Cancel", (dialogInterface, i) -> dialogInterface.dismiss());
+//            myAlert.show();
+//        }
+//        if (item.getItemId() == R.id.share) {
+//            try {
+//                String filelocation = Environment.getExternalStorageDirectory().getPath() + "/Neospectra/NEO.csv";
+//                Intent intent = new Intent(Intent.ACTION_SENDTO);
+//                intent.setType("text/plain");
+//                String message = "File to be shared is .";
+//                intent.putExtra(Intent.EXTRA_SUBJECT, "Students REPORT");
+//                intent.putExtra(Intent.EXTRA_STREAM, Uri.parse("file://" + filelocation));
+//                intent.putExtra(Intent.EXTRA_TEXT, message);
+//                intent.setData(Uri.parse("kaisarfajaroktavinusentiman@gmail.com"));   //insert your email address("mailto:csent.company@gmail.com")
+//                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+//                startActivity(intent);
+//
+//                Toast.makeText(getActivity(), "Berhasil", Toast.LENGTH_SHORT).show();
+//            } catch (Exception e) {
+//                System.out.println("is exception raises during sending mail" + e);
+//                Log.e("Erorr : ", String.valueOf(e));
+//                Toast.makeText(getActivity(), "Error : " + String.valueOf(e), Toast.LENGTH_SHORT).show();
+//            }
+//        }
+//        if (item.getItemId() == R.id.export_data) {
+//            final BottomSheetDialog bottomSheetDialog = new BottomSheetDialog(getActivity());
+//            bottomSheetDialog.setContentView(R.layout.bottom_sheet_dialog);
+//
+//            bottomSheetDialog.setCanceledOnTouchOutside(false);
+//
+//            LinearLayout bottom_sheet_refresh = bottomSheetDialog.findViewById(R.id.bottom_sheet_export);
+//            bottom_sheet_refresh.setVisibility(View.VISIBLE);
+//            CardView btn_yes = bottomSheetDialog.findViewById(R.id.btn_yes3);
+//            CardView btn_cancel = bottomSheetDialog.findViewById(R.id.btn_cancel3);
+//
+//            btn_yes.setOnClickListener(v -> {
+//
+//                if (checkStoragePermission()) {
+//                    //permission allowed
+//                    exportCSV();
+//                } else {
+//                    requestStoragePermissionExport();
+//                }
+//            });
+//
+//            btn_cancel.setOnClickListener(view -> bottomSheetDialog.hide());
+//
+//            bottomSheetDialog.show();
+//
+//        }
+//        if (item.getItemId() == R.id.delete) {
+//            Toast.makeText(getActivity(), "Delete Action", Toast.LENGTH_SHORT).show();
+//        }
+//        return super.onOptionsItemSelected(item);
+//    }

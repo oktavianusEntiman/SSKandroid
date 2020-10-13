@@ -28,6 +28,7 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
+import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -67,7 +68,7 @@ public class SettingsActivity extends NavDrawerActivity implements
     private Paint paint;
 
     //Bluetooth Area
-    private LinearLayout bluetoothBoard;
+    private RelativeLayout bluetoothBoard;
 
     static private TextView tvStatus;
 

@@ -1,77 +1,63 @@
 package com.si_ware.neospectra.Activities.Interfaces.ScanPage;
 
-import android.app.AlertDialog;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.SharedPreferences;
-import android.content.pm.ActivityInfo;
 import android.graphics.Color;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
-import android.support.design.widget.AppBarLayout;
 import android.support.design.widget.BottomSheetDialog;
 import android.support.v4.app.Fragment;
 import android.support.v4.content.ContextCompat;
 import android.support.v4.content.LocalBroadcastManager;
 import android.support.v7.app.AppCompatActivity;
-import android.support.v7.preference.PreferenceManager;
 import android.support.v7.widget.CardView;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
 import android.view.LayoutInflater;
-import android.view.Menu;
-import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowManager;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
-import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
+import android.widget.RelativeLayout;
 import android.widget.SeekBar;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.android.volley.AuthFailureError;
+import com.android.volley.Request;
+import com.android.volley.RequestQueue;
+import com.android.volley.Response;
+import com.android.volley.VolleyError;
+import com.android.volley.toolbox.StringRequest;
+import com.android.volley.toolbox.Volley;
+import com.github.ybq.android.spinkit.style.Wave;
 import com.jjoe64.graphview.GraphView;
 import com.jjoe64.graphview.series.DataPoint;
 import com.jjoe64.graphview.series.LineGraphSeries;
 import com.si_ware.neospectra.Activities.ConnectActivity;
-import com.si_ware.neospectra.Activities.HomeActivity;
 import com.si_ware.neospectra.Activities.IntroActivity;
-import com.si_ware.neospectra.Activities.MainActivity;
-import com.si_ware.neospectra.Activities.MainPage;
-import com.si_ware.neospectra.Activities.ResultsActivity;
-import com.si_ware.neospectra.Activities.SettingsActivity;
-import com.si_ware.neospectra.BluetoothSDK.SWS_P3API;
 import com.si_ware.neospectra.Global.GlobalVariables;
 import com.si_ware.neospectra.Models.dbReading;
 import com.si_ware.neospectra.R;
 import com.si_ware.neospectra.Scan.Presenter.ScanPresenter;
-
-import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 
+import static com.si_ware.neospectra.Global.GlobalVariables.MAX_SCANNER_MEMORY;
 import static com.si_ware.neospectra.Global.GlobalVariables.bluetoothAPI;
-import static com.si_ware.neospectra.Global.GlobalVariables.filterDate;
 import static com.si_ware.neospectra.Global.GlobalVariables.gAllSpectra;
-import static com.si_ware.neospectra.Global.GlobalVariables.gApodizationFunction;
-import static com.si_ware.neospectra.Global.GlobalVariables.gCorrectionMode;
-import static com.si_ware.neospectra.Global.GlobalVariables.gFftPoints;
-import static com.si_ware.neospectra.Global.GlobalVariables.gInterpolationPoints;
-import static com.si_ware.neospectra.Global.GlobalVariables.gIsFftEnabled;
-import static com.si_ware.neospectra.Global.GlobalVariables.gIsInterpolationEnabled;
-import static com.si_ware.neospectra.Global.GlobalVariables.gOpticalGainSettings;
-import static com.si_ware.neospectra.Global.GlobalVariables.gOpticalGainValue;
-import static com.si_ware.neospectra.Global.GlobalVariables.gRunMode;
-import static com.si_ware.neospectra.Global.GlobalVariables.measurmentsViewCaller;
 import static com.si_ware.neospectra.Global.GlobalVariables.progressBarPosition;
 import static com.si_ware.neospectra.Global.GlobalVariables.scanTime;
 import static com.si_ware.neospectra.Global.MethodsFactory.logMessage;
@@ -85,8 +71,10 @@ public class ScanPageFragment extends Fragment {
     private Context mContext;
 
     GraphView mGraphView;
-    CardView btnRefresh, btnBackground, btnScan, btnProcess;
+    CardView btnRefresh, btnBackground, btnScan, btnProcess, btnClearRecord;
     Spinner edtResolution, edtOptical;
+    private LinearLayout lProgress;
+    private RelativeLayout lUtama;
     public boolean isScanBG = false;
     public int backgroundScanTime = 2;
     private ProgressBar pbProgressBar;
@@ -99,16 +87,21 @@ public class ScanPageFragment extends Fragment {
     private int count = 1;
     private boolean isWaitingForSensorReading = false;
     private boolean isStopEnabled = false;
-    private TextView tv_progressCount;
-    private TextView tv_progressValue;
+    private TextView tv_progressCount, tv_progressValue, tv_scanRecord;
     private double maxValue = 0;
     private static int measurementCount_Spectroscopy = 0;
     private static int colors[] = {0xFFFF0000, 0xFF0000FF, 0xFF00FF00, 0xFF00FFFF, 0xFFFF007F, 0xFF7F00FF, 0xFFFF00FF, 0xFFFFFF00, 0xFF007FFF, 0xFFFF7F00, 0xFF00FF7F, 0xFF7FFF00};
     private int notifications_count = 0;
+    public boolean loading = false;
+    public double[] reading;
+    ProgressBar progressBar;
+    private double[] ySend;
 
 
     String[] Resolution = {"1", "2", "3"};
     String[] Optical = {"2", "4", "6", "8", "10"};
+
+    RequestQueue queue;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
@@ -122,15 +115,22 @@ public class ScanPageFragment extends Fragment {
         super.onViewCreated(view, savedInstanceState);
         final Drawable upArrow = getResources().getDrawable(R.drawable.ic_keyboard_arrow_left);
 
+        queue = Volley.newRequestQueue(getActivity());
+
+        LocalBroadcastManager.getInstance(getActivity()).registerReceiver(mMessageReceiver,
+                new IntentFilter(GlobalVariables.HOME_INTENT_ACTION));
+        LocalBroadcastManager.getInstance(getActivity()).registerReceiver(mMessageReceiver,
+                new IntentFilter(GlobalVariables.INTENT_ACTION));
+
         Toolbar toolbar = view.findViewById(R.id.titlebar);
         ((AppCompatActivity) getActivity()).setSupportActionBar(toolbar);
         ((AppCompatActivity) getActivity()).getSupportActionBar().setHomeAsUpIndicator(upArrow);
         ((AppCompatActivity) getActivity()).getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         ((AppCompatActivity) getActivity()).getSupportActionBar().setDisplayShowHomeEnabled(true);
 
-        if (bluetoothAPI == null) {
-            bluetoothAPI = new SWS_P3API(getActivity(), mContext);
-        }
+//        if (bluetoothAPI == null) {
+//            bluetoothAPI = new SWS_P3API(getActivity(), mContext);
+//        }
         mContext = getActivity();
 
         scanPresenter = new ScanPresenter();
@@ -145,10 +145,17 @@ public class ScanPageFragment extends Fragment {
         btnBackground = view.findViewById(R.id.btnBackground);
         btnScan = view.findViewById(R.id.btnScan);
         btnProcess = view.findViewById(R.id.btnProcess);
+        btnClearRecord = view.findViewById(R.id.btnClearRecord);
         edtResolution = view.findViewById(R.id.edtResolution);
         edtOptical = view.findViewById(R.id.edtOptical);
         pbProgressBar = view.findViewById(R.id.progressBarMain);
         textScan = view.findViewById(R.id.text_scan);
+        progressBar = view.findViewById(R.id.spin_kit);
+        tv_scanRecord = view.findViewById(R.id.tv_memory_percentage);
+        lProgress = view.findViewById(R.id.lProgressbar);
+        lUtama = view.findViewById(R.id.lUtama);
+        lProgress.setVisibility(View.GONE);
+        lUtama.setVisibility(View.VISIBLE);
         textScan.setText("Scan");
         tx_numberOfRuns = view.findViewById(R.id.tx_numberOfRuns);
         tv_progressCount = view.findViewById(R.id.countProgress);
@@ -160,37 +167,34 @@ public class ScanPageFragment extends Fragment {
         edtResolution.setAdapter(itemResolution);
         edtOptical.setAdapter(itemOptical);
 
+
         btnRefresh.setEnabled(false);
-        btnRefresh.setOnClickListener(null);
         btnRefresh.setCardBackgroundColor(Color.parseColor("#0A376A"));
         btnScan.setEnabled(false);
         btnScan.setCardBackgroundColor(Color.parseColor("#0A376A"));
-        btnScan.setOnClickListener(null);
-        btnProcess.setEnabled(false);
+        btnProcess.setEnabled(true);
         btnProcess.setCardBackgroundColor(Color.parseColor("#0A376A"));
-        btnProcess.setOnClickListener(null);
-
 
         // Get all needed configuration settings
-        SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(mContext);
-        gRunMode = preferences.getString("run_mode", GlobalVariables.runMode.Single_Mode.toString());
-        gIsInterpolationEnabled = preferences.getBoolean("linear_interpolation_switch", false);
-        gInterpolationPoints = preferences.getString("data_points", GlobalVariables.pointsCount.points_257.toString());
-        gIsFftEnabled = preferences.getBoolean("fft_settings_switch", false);
-        gApodizationFunction = preferences.getString("apodization_function", GlobalVariables.apodization.Boxcar.toString());
-        gFftPoints = preferences.getString("fft_points", GlobalVariables.zeroPadding.points_8k.toString());
-        gOpticalGainSettings = preferences.getString("optical_gain_settings", "Default");
-        gOpticalGainValue = preferences.getInt(gOpticalGainSettings, 0);
-        gCorrectionMode = preferences.getString("wavelength_correction", GlobalVariables.wavelengthCorrection.Self_Calibration.toString());
+//        SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(mContext);
+//        gRunMode = preferences.getString("run_mode", GlobalVariables.runMode.Single_Mode.toString());
+//        gIsInterpolationEnabled = preferences.getBoolean("linear_interpolation_switch", false);
+//        gInterpolationPoints = preferences.getString("data_points", GlobalVariables.pointsCount.points_257.toString());
+//        gIsFftEnabled = preferences.getBoolean("fft_settings_switch", false);
+//        gApodizationFunction = preferences.getString("apodization_function", GlobalVariables.apodization.Boxcar.toString());
+//        gFftPoints = preferences.getString("fft_points", GlobalVariables.zeroPadding.points_8k.toString());
+//        gOpticalGainSettings = preferences.getString("optical_gain_settings", "Default");
+//        gOpticalGainValue = preferences.getInt(gOpticalGainSettings, 0);
+//        gCorrectionMode = preferences.getString("wavelength_correction", GlobalVariables.wavelengthCorrection.Self_Calibration.toString());
 
-        ArrayAdapter<CharSequence> bluetoothSpinnerAdapter = ArrayAdapter.createFromResource(mContext,
-                R.array.BLE_Services, android.R.layout.simple_spinner_item);
-        bluetoothSpinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+//        ArrayAdapter<CharSequence> bluetoothSpinnerAdapter = ArrayAdapter.createFromResource(mContext,
+//                R.array.BLE_Services, android.R.layout.simple_spinner_item);
+//        bluetoothSpinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
 
         // Adjust progress value if scan time changed from its default value
-//        if (scanTime != 2) {
-//            tv_progressValue.setX(progressBarPosition / 2);
-//        }
+        if (scanTime != 2) {
+            tv_progressValue.setX(progressBarPosition / 2);
+        }
 
         pbProgressBar.setVisibility(View.INVISIBLE);
 //        btnViewScan = findViewById(R.id.button_viewScan);
@@ -202,11 +206,43 @@ public class ScanPageFragment extends Fragment {
         tv_progressCount.setBackgroundColor(Color.parseColor("#0A376A"));
         tv_progressCount.setEnabled(false);
 
+        btnClearRecord.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                android.support.v7.app.AlertDialog.Builder myAlert = new android.support.v7.app.AlertDialog
+                        .Builder(mContext);
+                myAlert.setTitle("Clear Record");
+                myAlert.setMessage("Are you sure you want to clear all record?");
+                myAlert.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(@NonNull DialogInterface dialogInterface, int i) {
+                        dialogInterface.dismiss();
+//                        if (bluetoothAPI != null) bluetoothAPI.sendClearMemoryRequest();
+                        double reflectance[] = {12.4, 35.2, 25.6, 98.7, 56.4};
+                        String Reflectance[] = new String[reflectance.length];
 
-//        ArrayAdapter<CharSequence> bluetoothSpinnerAdapter = ArrayAdapter.createFromResource(mContext,
-//                R.array.BLE_Services, android.R.layout.simple_spinner_item);
-//        bluetoothSpinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+//                        for(int a=0; a<reflectance.length; a++) {
+//                            Reflectance[a] = String.valueOf(reflectance[a]);
+//                            System.out.println(Reflectance[a]);
+//                            Toast.makeText(getActivity(), Reflectance[a], Toast.LENGTH_SHORT).show();
+//                        }
 
+                        double[] ds =  { 2.0, 3.1, 3, 7 };
+                        for (String s : getStrings(ds)){
+                            System.out.println(s);
+                            Toast.makeText(getActivity(), s, Toast.LENGTH_LONG).show();
+                        }
+                    }
+                });
+                myAlert.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(@NonNull DialogInterface dialogInterface, int i) {
+                        dialogInterface.dismiss();
+                    }
+                });
+                myAlert.show();
+            }
+        });
 
         btnRefresh.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -244,16 +280,16 @@ public class ScanPageFragment extends Fragment {
                         measurementCount_Spectroscopy = 0;
                         tx_numberOfRuns.setText("1");
                         btnRefresh.setEnabled(false);
-                        btnRefresh.setOnClickListener(null);
                         btnRefresh.setCardBackgroundColor(Color.parseColor("#0A376A"));
                         btnScan.setEnabled(false);
                         btnScan.setCardBackgroundColor(Color.parseColor("#0A376A"));
-                        btnScan.setOnClickListener(null);
                         btnProcess.setEnabled(false);
                         btnProcess.setCardBackgroundColor(Color.parseColor("#0A376A"));
-                        btnProcess.setOnClickListener(null);
-                        btnBackground.setCardBackgroundColor(Color.parseColor("#1d86ff"));
                         btnBackground.setEnabled(true);
+                        btnBackground.setCardBackgroundColor(Color.parseColor("#1d86ff"));
+                        progressBar.setVisibility(View.GONE);
+                        lProgress.setVisibility(View.GONE);
+                        lUtama.setVisibility(View.VISIBLE);
                         bottomSheetDialog.hide();
 
                     }
@@ -311,17 +347,31 @@ public class ScanPageFragment extends Fragment {
 //                    btnViewScan.setBackgroundTintList(ContextCompat.getColorStateList(mContext, R.color.Button_Disabled));
 //                    btnViewScan.setEnabled(false);
                     isScanBG = false;
+
+                    Wave wave = new Wave();
+                    lProgress.setVisibility(View.VISIBLE);
+                    lUtama.setVisibility(View.GONE);
+                    progressBar.setVisibility(View.VISIBLE);
+                    progressBar.setIndeterminateDrawable(wave);
+
                     textScan.setText("Stop");
+
+//                        Wave wave = new Wave();
+//                        progressBar.setVisibility(View.VISIBLE);
+//                        progressBar.setIndeterminateDrawable(wave);
+
                     btnScan.setCardBackgroundColor(Color.parseColor("#ff1d21"));
 
                     btnRefresh.setEnabled(true);
                     btnRefresh.setCardBackgroundColor(Color.parseColor("#1D86FF"));
+
                     btnProcess.setEnabled(true);
                     btnProcess.setCardBackgroundColor(Color.parseColor("#1D86FF"));
 
                     btnBackground.setCardBackgroundColor(Color.parseColor("#0A376A"));
                     btnBackground.setEnabled(false);
-                    btnBackground.setOnClickListener(null);
+
+
                     if (Double.parseDouble(tx_numberOfRuns.getText().toString()) > 1) {
 //                        tv_progressCount.setEnabled(true);
                         pbProgressBar.setVisibility(View.VISIBLE);
@@ -369,7 +419,7 @@ public class ScanPageFragment extends Fragment {
                 @Override
                 public void onClick(View v) {
 //                        fungsi yes pada bottom sheet
-                    displayGraph();
+                    SendReflectance();
                     bottomSheetDialog2.hide();
 
 //                        measurmentsViewCaller = MainPage.class;
@@ -407,6 +457,8 @@ public class ScanPageFragment extends Fragment {
 
         //Register the broadcast receiver
         LocalBroadcastManager.getInstance(getActivity()).registerReceiver(mMessageReceiver,
+                new IntentFilter(GlobalVariables.HOME_INTENT_ACTION));
+        LocalBroadcastManager.getInstance(getActivity()).registerReceiver(mMessageReceiver,
                 new IntentFilter(GlobalVariables.INTENT_ACTION));
 
         if (bluetoothAPI != null) {
@@ -421,7 +473,7 @@ public class ScanPageFragment extends Fragment {
     @Override
     public void onPause() {
         super.onPause();
-        // Unregister the receiver
+
         LocalBroadcastManager.getInstance(getActivity()).unregisterReceiver(mMessageReceiver);
     }
 
@@ -433,6 +485,7 @@ public class ScanPageFragment extends Fragment {
 
 
             String intentName = intent.getStringExtra("iName");
+
             switch (intentName) {
                 //Case data is received successfully
                 case "sensorNotification_data":
@@ -467,7 +520,45 @@ public class ScanPageFragment extends Fragment {
                 case "Disconnection_Notification":
                     endActivity();
                     break;
+                // Receive a streamed data due to a taken scan
+                case "MemoryScanData":
+                    reading = intent.getDoubleArrayExtra("data");
 
+                    if (reading == null) {
+                        logMessage("HomeView", "Reading is NULL.");
+                        return;
+                    }
+
+                    // The array constructed from two arrays have the same length, Y, then X.
+                    int middleOfArray = reading.length / 2;
+                    double[] x_reading = new double[middleOfArray],
+                            y_reading = new double[middleOfArray];
+                    // split the main array to two arrays, Y & X
+                    for (int i = 0; i < middleOfArray; i++) {
+                        //Added this fix for the inconsistency in size of received data
+                        y_reading[i] = reading[i];
+                        x_reading[i] = reading[middleOfArray + i];
+                    }
+
+                    if ((y_reading.length > 0) && (x_reading.length > 0)) {
+                        dbReading newReading = new dbReading();
+                        newReading.setReading(y_reading, x_reading);
+                        gAllSpectra.add(newReading);
+                    }
+
+                    break;
+                // Receive a memory information
+                case "Memory":
+                    logMessage("MainPage", "Intent Received:\n" +
+                            "Name: " + intent.getStringExtra("iName") + "\n" +
+                            "Success: " + intent.getBooleanExtra("isNotificationSuccess", false) + "\n" +
+                            "Reason: " + intent.getStringExtra("reason") + "\n" +
+                            "Error: " + intent.getStringExtra("err") + "\n" +
+                            "data : " + intent.getLongExtra("data", 0) + "\n");
+                    tv_scanRecord.setTextSize(15);
+                    tv_scanRecord.setText("" + intent.getLongExtra("data", 0) + "/"
+                            + MAX_SCANNER_MEMORY);
+                    break;
                 default:
                     Log.v(TAG + "intent", "Got unknown broadcast intent");
             }
@@ -485,6 +576,10 @@ public class ScanPageFragment extends Fragment {
 //            btnViewScan.setBackgroundTintList(ContextCompat.getColorStateList(mContext, R.color.orange));
             btnBackground.setEnabled(true);
             btnBackground.setCardBackgroundColor(Color.parseColor("#1d86ff"));
+
+            progressBar.setVisibility(View.GONE);
+            lProgress.setVisibility(View.GONE);
+            lUtama.setVisibility(View.VISIBLE);
         } else {
             btnScan.setCardBackgroundColor(Color.parseColor("#0A376A"));
             btnScan.setEnabled(false);
@@ -542,7 +637,7 @@ public class ScanPageFragment extends Fragment {
         }
 
         // Get readings
-        double[] reading = intent.getDoubleArrayExtra("data");
+        reading = intent.getDoubleArrayExtra("data");
 
         if (reading == null) {
             logMessage(TAG, "Reading is NULL.");
@@ -588,17 +683,13 @@ public class ScanPageFragment extends Fragment {
 
                 btnScan.setCardBackgroundColor(Color.parseColor("#1d86ff"));
 //                btnViewScan.setBackgroundTintList(ContextCompat.getColorStateList(mContext, R.color.orange));
-                btnScan.setEnabled(true);
 //                btnViewScan.setEnabled(true);
 
                 btnBackground.setCardBackgroundColor(Color.parseColor("#1d86ff"));
-                btnBackground.setEnabled(true);
-
                 btnRefresh.setCardBackgroundColor(Color.parseColor("#1d86ff"));
-                btnRefresh.setEnabled(true);
-
                 btnProcess.setCardBackgroundColor(Color.parseColor("#1d86ff"));
-                btnProcess.setEnabled(true);
+                getActivity().getWindow().clearFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE);
+
                 textScan.setText("Scan");
 
                 count++;
@@ -648,11 +739,23 @@ public class ScanPageFragment extends Fragment {
 
     private void sendBackgroundCommand() {
         System.out.println("inside sendBackgroundCommand");
+
         if (isWaitingForBackGroundReading) {
             logMessage(TAG, "Still waiting for sensor reading ... ");
+
             return;
         }
         isWaitingForBackGroundReading = true;
+
+        btnRefresh.setEnabled(false);
+        btnRefresh.setCardBackgroundColor(Color.parseColor("#0A376A"));
+        btnScan.setEnabled(true);
+        btnScan.setCardBackgroundColor(Color.parseColor("#1D86FF"));
+        btnProcess.setEnabled(false);
+        btnProcess.setCardBackgroundColor(Color.parseColor("#0A376A"));
+        btnBackground.setEnabled(false);
+        btnBackground.setCardBackgroundColor(Color.parseColor("#0A376A"));
+
         askForBackGroundReading();
     }
 
@@ -711,23 +814,18 @@ public class ScanPageFragment extends Fragment {
             return;
         }
 
-        btnRefresh.setEnabled(false);
-        btnRefresh.setOnClickListener(null);
-        btnRefresh.setCardBackgroundColor(Color.parseColor("#0A376A"));
-        btnScan.setEnabled(true);
-        btnScan.setCardBackgroundColor(Color.parseColor("#1D86FF"));
-        btnProcess.setEnabled(false);
-        btnProcess.setOnClickListener(null);
-        btnProcess.setCardBackgroundColor(Color.parseColor("#0A376A"));
-        btnBackground.setCardBackgroundColor(Color.parseColor("#0A376A"));
-        btnBackground.setEnabled(false);
-        btnBackground.setOnClickListener(null);
+        progressBar.setVisibility(View.VISIBLE);
+        lUtama.setVisibility(View.GONE);
+        lProgress.setVisibility(View.VISIBLE);
+        Wave wave = new Wave();
+        progressBar.setIndeterminateDrawable(wave);
+
         scanPresenter.requestBackgroundReading(2);
     }
 
     private void endActivity() {
         bluetoothAPI = null;
-        Intent mIntent = new Intent(getActivity(), ConnectActivity.class);
+        Intent mIntent = new Intent(getActivity(), IntroActivity.class);
         startActivity(mIntent);
     }
 
@@ -740,6 +838,8 @@ public class ScanPageFragment extends Fragment {
                 if ((sensorReading.getXReading().length != 0) && (sensorReading.getYReading().length != 0)) {
                     double[] xVals = sensorReading.getXReading();
                     double[] yVals = sensorReading.getYReading();
+
+                    ySend = sensorReading.getYReading();
 
                     for (int j = xVals.length - 1; j >= 0; --j) {
                         dataPoints.add(new DataPoint(1e7 / xVals[j], yVals[j] * 100));
@@ -798,5 +898,54 @@ public class ScanPageFragment extends Fragment {
             myAlert.show();
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    public void SendReflectance() {
+        queue = Volley.newRequestQueue(getActivity());
+        String URL = "https://sskapi.azurewebsites.net/api/Inference/ProcessData";
+        Toast.makeText(getActivity(), String.valueOf(ySend), Toast.LENGTH_SHORT).show();
+        Log.e("sumbuY : ", String.valueOf(ySend));
+
+        StringRequest stringRequest = new StringRequest(Request.Method.POST, URL,
+                new Response.Listener<String>() {
+                    @Override
+                    public void onResponse(String response) {
+                        try {
+                            Toast.makeText(getActivity(), response, Toast.LENGTH_SHORT).show();
+
+                        } catch (Exception e) {
+                            Toast.makeText(getActivity(), "Server Error", Toast.LENGTH_LONG).show();
+                        }
+                    }
+                }, new Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError error) {
+                Toast.makeText(getActivity(), error.getMessage(), Toast.LENGTH_LONG).show();
+            }
+        }) {
+            @Override
+            protected Map<String, String> getParams() throws AuthFailureError {
+                Map<String, String> params = new HashMap<String, String>();
+                params.put("reflectance", String.valueOf(ySend));
+                return params;
+            }
+
+            @Override
+            public Map<String, String> getHeaders() throws AuthFailureError {
+                Map<String, String> params = new HashMap<String, String>();
+                params.put("Context-Type", "Aplication/json");
+                return params;
+            }
+        };
+        queue.add(stringRequest);
+    }
+
+    public static String[] getStrings(double[] a) {
+        String[] output = new String[a.length];
+        int i = 0;
+        for (double d : a){
+            output[i++] = Arrays.toString(String.valueOf(d).replace("{", "").replace("}", "").split(","));
+        }
+        return output;
     }
 }
