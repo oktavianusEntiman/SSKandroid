@@ -4,10 +4,13 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import android.app.DownloadManager;
 import android.content.Context;
+import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.EditText;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.android.volley.AuthFailureError;
@@ -30,59 +33,47 @@ import java.util.Map;
 
 public class json extends AppCompatActivity {
 
-    RequestQueue queue;
+    EditText edt;
     Button action;
-    public String username,name, course, session;
+    TextView txt;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_json);
-        queue = Volley.newRequestQueue(this);
 
+        edt = findViewById(R.id.edt);
         action = findViewById(R.id.action);
+        txt = findViewById(R.id.txt);
 
         action.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                parsingJson();
+                String sendStr = edt.getText().toString();
+
+                tampungStr(sendStr);
+
+//                Intent intent = new Intent(getApplicationContext(), json.class);
+//                intent.putExtra("message", sendStr);
+//                startActivity(intent);
             }
         });
     }
 
-    public void parsingJson() {
-        String URL = "http://parsingjson.000webhostapp.com/";
-
-        StringRequest stringRequest = new StringRequest(Request.Method.GET, URL,
-                new Response.Listener<String>() {
-                    @Override
-                    public void onResponse(String response) {
-                        try {
-                            JSONObject jsonObject = new JSONObject(response);
-                            JSONArray jsonArray = jsonObject.getJSONArray("result");
-
-                            for (int i = 0; i < jsonArray.length(); i++) {
-                                JSONObject jsonObject1 = jsonArray.getJSONObject(i);
-
-                                username = jsonObject1.getString("username");
-                                name = jsonObject1.getString("name");
-                                course = jsonObject1.getString("course");
-                                session = jsonObject1.getString("session");
-                            }
-                            Toast.makeText(json.this, "username : " + username, Toast.LENGTH_SHORT).show();
-                        } catch (JSONException e) {
-                            e.printStackTrace();
-                        }
-
-                    }
-                }, new Response.ErrorListener() {
-            @Override
-            public void onErrorResponse(VolleyError error) {
-                error.printStackTrace();
-            }
-        });
-        queue.add(stringRequest);
+    public void tampungStr(String sendStr){
+        final String tampung = sendStr;
+        tampilStr(tampung);
     }
 
+    public void tampilStr(String tampung){
+        txt.setText(tampung);
+    }
 
+    @Override
+    protected void onResume() {
+//        Intent i = getIntent();
+//        String getStr = i.getStringExtra("message");
+//        txt.setText(getStr);
+        super.onResume();
+    }
 }
