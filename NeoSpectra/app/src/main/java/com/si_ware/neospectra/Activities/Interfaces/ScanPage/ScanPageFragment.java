@@ -45,11 +45,18 @@ import com.jjoe64.graphview.GraphView;
 import com.jjoe64.graphview.series.DataPoint;
 import com.jjoe64.graphview.series.LineGraphSeries;
 import com.si_ware.neospectra.Activities.ConnectActivity;
+import com.si_ware.neospectra.Activities.Interfaces.Objects;
 import com.si_ware.neospectra.Activities.IntroActivity;
+import com.si_ware.neospectra.BluetoothSDK.SWS_P3API;
 import com.si_ware.neospectra.Global.GlobalVariables;
 import com.si_ware.neospectra.Models.dbReading;
 import com.si_ware.neospectra.R;
 import com.si_ware.neospectra.Scan.Presenter.ScanPresenter;
+
+import org.json.JSONObject;
+
+import java.io.UnsupportedEncodingException;
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -96,7 +103,7 @@ public class ScanPageFragment extends Fragment {
     public double[] reading;
     ProgressBar progressBar;
     private double[] ySend;
-
+    private Objects getset = new Objects();
 
     String[] Resolution = {"1", "2", "3"};
     String[] Optical = {"2", "4", "6", "8", "10"};
@@ -128,9 +135,9 @@ public class ScanPageFragment extends Fragment {
         ((AppCompatActivity) getActivity()).getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         ((AppCompatActivity) getActivity()).getSupportActionBar().setDisplayShowHomeEnabled(true);
 
-//        if (bluetoothAPI == null) {
-//            bluetoothAPI = new SWS_P3API(getActivity(), mContext);
-//        }
+        if (bluetoothAPI == null) {
+            bluetoothAPI = new SWS_P3API(getActivity(), mContext);
+        }
         mContext = getActivity();
 
         scanPresenter = new ScanPresenter();
@@ -187,9 +194,9 @@ public class ScanPageFragment extends Fragment {
 //        gOpticalGainValue = preferences.getInt(gOpticalGainSettings, 0);
 //        gCorrectionMode = preferences.getString("wavelength_correction", GlobalVariables.wavelengthCorrection.Self_Calibration.toString());
 
-//        ArrayAdapter<CharSequence> bluetoothSpinnerAdapter = ArrayAdapter.createFromResource(mContext,
-//                R.array.BLE_Services, android.R.layout.simple_spinner_item);
-//        bluetoothSpinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        ArrayAdapter<CharSequence> bluetoothSpinnerAdapter = ArrayAdapter.createFromResource(mContext,
+                R.array.BLE_Services, android.R.layout.simple_spinner_item);
+        bluetoothSpinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
 
         // Adjust progress value if scan time changed from its default value
         if (scanTime != 2) {
@@ -227,8 +234,8 @@ public class ScanPageFragment extends Fragment {
 //                            Toast.makeText(getActivity(), Reflectance[a], Toast.LENGTH_SHORT).show();
 //                        }
 
-                        double[] ds =  { 2.0, 3.1, 3, 7 };
-                        for (String s : getStrings(ds)){
+                        double[] ds = {2.0, 3.1, 3, 7};
+                        for (String s : getStrings(ds)) {
                             System.out.println(s);
                             Toast.makeText(getActivity(), s, Toast.LENGTH_LONG).show();
                         }
@@ -419,12 +426,8 @@ public class ScanPageFragment extends Fragment {
                 @Override
                 public void onClick(View v) {
 //                        fungsi yes pada bottom sheet
-                    SendReflectance();
+                    send();
                     bottomSheetDialog2.hide();
-
-//                        measurmentsViewCaller = MainPage.class;
-//                        Intent intent = new Intent(getActivity(), ResultsActivity.class);
-//                        startActivity(intent);
                 }
             });
 
@@ -839,7 +842,8 @@ public class ScanPageFragment extends Fragment {
                     double[] xVals = sensorReading.getXReading();
                     double[] yVals = sensorReading.getYReading();
 
-                    ySend = sensorReading.getYReading();
+                    String s = "{\"Reflectance\":" + Arrays.toString(yVals) + "}";
+                    getset.reflectance = s;
 
                     for (int j = xVals.length - 1; j >= 0; --j) {
                         dataPoints.add(new DataPoint(1e7 / xVals[j], yVals[j] * 100));
@@ -900,50 +904,61 @@ public class ScanPageFragment extends Fragment {
         return super.onOptionsItemSelected(item);
     }
 
-    public void SendReflectance() {
-        queue = Volley.newRequestQueue(getActivity());
-        String URL = "https://sskapi.azurewebsites.net/api/Inference/ProcessData";
-        Toast.makeText(getActivity(), String.valueOf(ySend), Toast.LENGTH_SHORT).show();
-        Log.e("sumbuY : ", String.valueOf(ySend));
+    public void send() {
+        Wave rotatingCircle = new Wave();
+        progressBar.setVisibility(View.VISIBLE);
+        progressBar.setIndeterminateDrawable(rotatingCircle);
+        lUtama.setVisibility(View.GONE);
+        lProgress.setVisibility(View.VISIBLE);
+        getActivity().getWindow().setFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE);
 
+        final String reflect = getset.getReflectance();
+        String URL = "https://sskapi.azurewebsites.net/api/Inference/ProcessData";
+        queue = Volley.newRequestQueue(getActivity());
         StringRequest stringRequest = new StringRequest(Request.Method.POST, URL,
                 new Response.Listener<String>() {
                     @Override
                     public void onResponse(String response) {
                         try {
-                            Toast.makeText(getActivity(), response, Toast.LENGTH_SHORT).show();
-
+                            JSONObject jsonObject = new JSONObject(response);
+                            Toast.makeText(getActivity(), "RESPONSE:" + jsonObject, Toast.LENGTH_LONG).show();
+                            Log.e("response:", response);
+                            lUtama.setVisibility(View.VISIBLE);
+                            lProgress.setVisibility(View.GONE);
+                            getActivity().getWindow().clearFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE);
                         } catch (Exception e) {
-                            Toast.makeText(getActivity(), "Server Error", Toast.LENGTH_LONG).show();
+                            e.printStackTrace();
                         }
                     }
                 }, new Response.ErrorListener() {
             @Override
             public void onErrorResponse(VolleyError error) {
-                Toast.makeText(getActivity(), error.getMessage(), Toast.LENGTH_LONG).show();
+                error.printStackTrace();
             }
         }) {
             @Override
-            protected Map<String, String> getParams() throws AuthFailureError {
-                Map<String, String> params = new HashMap<String, String>();
-                params.put("reflectance", String.valueOf(ySend));
-                return params;
+            public String getBodyContentType() {
+                return "application/json; charset=utf-8";
             }
 
             @Override
-            public Map<String, String> getHeaders() throws AuthFailureError {
-                Map<String, String> params = new HashMap<String, String>();
-                params.put("Context-Type", "Aplication/json");
-                return params;
+            public byte[] getBody() throws AuthFailureError {
+                try {
+                    return reflect == null ? null : reflect.getBytes("utf-8");
+                } catch (UnsupportedEncodingException uee) {
+                    return null;
+                }
             }
         };
         queue.add(stringRequest);
+
     }
 
     public static String[] getStrings(double[] a) {
         String[] output = new String[a.length];
         int i = 0;
-        for (double d : a){
+        for (double d : a) {
             output[i++] = Arrays.toString(String.valueOf(d).replace("{", "").replace("}", "").split(","));
         }
         return output;
