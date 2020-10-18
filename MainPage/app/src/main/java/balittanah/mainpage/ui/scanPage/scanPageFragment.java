@@ -325,12 +325,20 @@ public class scanPageFragment extends Fragment {
 
                         } catch (Exception e) {
                             e.printStackTrace();
+                            progressBar.setVisibility(View.GONE);
+                            lUtama.setVisibility(View.VISIBLE);
+                            lLoading.setVisibility(View.GONE);
+                            getActivity().getWindow().clearFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE);
                         }
                     }
                 }, new Response.ErrorListener() {
             @Override
             public void onErrorResponse(VolleyError error) {
                 error.printStackTrace();
+                progressBar.setVisibility(View.GONE);
+                lUtama.setVisibility(View.VISIBLE);
+                lLoading.setVisibility(View.GONE);
+                getActivity().getWindow().clearFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE);
             }
         });
         mQueue.add(jsonObjectRequest);
