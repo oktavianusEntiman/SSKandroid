@@ -843,7 +843,7 @@ public class ScanPageFragment extends Fragment {
                     double[] yVals = sensorReading.getYReading();
 
                     String s = "{\"Reflectance\":" + Arrays.toString(yVals) + "}";
-                    getset.reflectance = s;
+                    getset.setReflectance(s);
 
                     for (int j = xVals.length - 1; j >= 0; --j) {
                         dataPoints.add(new DataPoint(1e7 / xVals[j], yVals[j] * 100));
@@ -926,6 +926,7 @@ public class ScanPageFragment extends Fragment {
                             Log.e("response:", response);
                             lUtama.setVisibility(View.VISIBLE);
                             lProgress.setVisibility(View.GONE);
+                            progressBar.setVisibility(View.GONE);
                             getActivity().getWindow().clearFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE);
                         } catch (Exception e) {
                             e.printStackTrace();
@@ -935,6 +936,11 @@ public class ScanPageFragment extends Fragment {
             @Override
             public void onErrorResponse(VolleyError error) {
                 error.printStackTrace();
+                lUtama.setVisibility(View.VISIBLE);
+                lProgress.setVisibility(View.GONE);
+                progressBar.setVisibility(View.GONE);
+                getActivity().getWindow().clearFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE);
+                Toast.makeText(mContext, "Periksa jaringan dan ulang proses", Toast.LENGTH_SHORT).show();
             }
         }) {
             @Override
