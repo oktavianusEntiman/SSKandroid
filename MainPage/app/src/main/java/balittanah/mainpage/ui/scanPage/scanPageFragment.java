@@ -59,6 +59,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
+import balittanah.mainpage.Myobj;
 import balittanah.mainpage.R;
 import balittanah.mainpage.ui.dataPage.dataPageFragment;
 
@@ -68,7 +69,7 @@ public class scanPageFragment extends Fragment {
     CardView btnRefresh, btnBackground, btnScan, btnProcess;
     Spinner edtResolution, edtOptical;
     TextView tampung;
-    private getset datareflect = new getset();
+    public Myobj datareflect = new Myobj();
 
     String[] Resolution = {"1px", "2px", "3px", "4px"};
     String[] Optical = {"1px", "2px", "3px", "4px"};
@@ -191,8 +192,7 @@ public class scanPageFragment extends Fragment {
             @Override
             public void onClick(View v) {
 //                fungsi scan background
-                String baru = datareflect.getDataReflectance();
-                Toast.makeText(getActivity(), baru, Toast.LENGTH_LONG).show();
+//                Toast.makeText(getActivity(), "value 20 = " + datareflect.getElementValue21(), Toast.LENGTH_LONG).show();
             }
         });
 
@@ -362,8 +362,81 @@ public class scanPageFragment extends Fragment {
                     public void onResponse(String response) {
                         try {
                             JSONObject jsonObject = new JSONObject(response);
-                            Toast.makeText(getActivity(), "RESPONSE:" + jsonObject, Toast.LENGTH_LONG).show();
-                            Log.e("response:", response);
+                            JSONArray jsonArray = jsonObject.getJSONArray("data");
+                            Log.e("jumlah array:", String.valueOf(jsonArray.length()));
+
+                            for (int i = 0; i < jsonArray.length(); i++) {
+                                JSONObject jsonObject1 = jsonArray.getJSONObject(i);
+                                String elementName = jsonObject1.getString("elementName");
+                                double elementValue = jsonObject1.getDouble("elementValue");
+
+                                if (i==0) {
+                                    datareflect.setElementValue1(elementValue);
+                                }
+                                if (i==1) {
+                                    datareflect.setElementValue2(elementValue);
+                                }
+                                if (i==2) {
+                                    datareflect.setElementValue3(elementValue);
+                                }
+                                if (i==3) {
+                                    datareflect.setElementValue4(elementValue);
+                                }
+                                if (i==4) {
+                                    datareflect.setElementValue5(elementValue);
+                                }
+                                if (i==5) {
+                                    datareflect.setElementValue6(elementValue);
+                                }
+                                if (i==6) {
+                                    datareflect.setElementValue7(elementValue);
+                                }
+                                if (i==7) {
+                                    datareflect.setElementValue8(elementValue);
+                                }
+                                if (i==8) {
+                                    datareflect.setElementValue9(elementValue);
+                                }
+                                if (i==9) {
+                                    datareflect.setElementValue10(elementValue);
+                                }
+                                if (i==10) {
+                                    datareflect.setElementValue11(elementValue);
+                                }
+                                if (i==11) {
+                                    datareflect.setElementValue12(elementValue);
+                                }
+                                if (i==12) {
+                                    datareflect.setElementValue13(elementValue);
+                                }
+                                if (i==13) {
+                                    datareflect.setElementValue14(elementValue);
+                                }
+                                if (i==14) {
+                                    datareflect.setElementValue15(elementValue);
+                                }
+                                if (i==15) {
+                                    datareflect.setElementValue16(elementValue);
+                                }
+                                if (i==16) {
+                                    datareflect.setElementValue17(elementValue);
+                                }
+                                if (i==17) {
+                                    datareflect.setElementValue18(elementValue);
+                                }
+                                if (i==18) {
+                                    datareflect.setElementValue19(elementValue);
+                                }
+                                if (i==19) {
+                                    datareflect.setElementValue20(elementValue);
+                                }
+                                if (i==20) {
+                                    datareflect.setElementValue21(elementValue);
+                                }
+
+//                                Toast.makeText(getActivity(), "RESPONSE:" + elementName + " = " + elementValue, Toast.LENGTH_SHORT).show();
+                                Log.e("response:", String.valueOf(elementName + " = " + elementValue));
+                            }
                             lUtama.setVisibility(View.VISIBLE);
                             lLoading.setVisibility(View.GONE);
                             getActivity().getWindow().clearFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE);
@@ -392,18 +465,5 @@ public class scanPageFragment extends Fragment {
             }
         };
         mQueue.add(stringRequest);
-
-    }
-
-    private class getset {
-        private String dataReflectance;
-
-        public String getDataReflectance() {
-            return dataReflectance;
-        }
-
-        public void setDataReflectance(String dataReflectance) {
-            this.dataReflectance = dataReflectance;
-        }
     }
 }

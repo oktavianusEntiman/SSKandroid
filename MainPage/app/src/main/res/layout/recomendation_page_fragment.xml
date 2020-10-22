@@ -5,12 +5,31 @@
     android:layout_height="match_parent"
     tools:context=".ui.recomendationPage.recomendationPageFragment">
 
-    <TextView
+    <LinearLayout
+        android:id="@+id/layout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="halaman rekomendasi"
+        android:orientation="horizontal"
         android:layout_centerInParent="true"
-        android:textAlignment="center"
-        android:gravity="center_horizontal" />
+        android:gravity="center">
 
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="WBC = "
+            />
+        <TextView
+            android:id="@+id/value"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="..."
+            />
+    </LinearLayout>
+
+    <Button
+        android:id="@+id/btnAction"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="action"
+        android:layout_below="@id/layout"/>
 </RelativeLayout>
