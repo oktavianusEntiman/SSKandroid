@@ -14,12 +14,14 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
+import android.support.design.widget.BottomSheetDialog;
 import android.support.design.widget.FloatingActionButton;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.Fragment;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.ActionBar;
 import android.support.v7.app.AppCompatActivity;
+import android.support.v7.widget.CardView;
 import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.SearchView;
 import android.support.v7.widget.Toolbar;
@@ -33,6 +35,7 @@ import android.view.ViewGroup;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.DatePicker;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -45,8 +48,21 @@ import com.si_ware.neospectra.dbtable.DBHelper;
 import com.si_ware.neospectra.dbtable.ModelRecord;
 import com.si_ware.neospectra.dbtable.addUpdateRecord;
 
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
+import org.apache.poi.hssf.util.HSSFColor;
+import org.apache.poi.ss.usermodel.BorderStyle;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.HorizontalAlignment;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.FileWriter;
+import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -75,7 +91,7 @@ public class ExportPageFragment extends Fragment {
     //DB helper
     private DBHelper dbHelper;
 
-//    action bar
+    //    action bar
     ActionBar actionBar;
 
     TextView dateFrom;
@@ -94,7 +110,7 @@ public class ExportPageFragment extends Fragment {
 
 
     //sort option
-    String orderByNewest = Constants.C_ADDED_TIME_STAMP + " DESC";
+    String orderByNewest = Constants.C_ID + " DESC";
     String orderByOldest = Constants.C_ADDED_TIME_STAMP + " ASC";
 
     //for refresh records, refresh with last choosen sort option
@@ -118,9 +134,9 @@ public class ExportPageFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        if (bluetoothAPI == null) {
-            bluetoothAPI = new SWS_P3API(getActivity(), mContext);
-        }
+//        if (bluetoothAPI == null) {
+//            bluetoothAPI = new SWS_P3API(getActivity(), mContext);
+//        }
         mContext = getActivity();
 
         final Drawable upArrow = getResources().getDrawable(R.drawable.ic_keyboard_arrow_left);
@@ -220,12 +236,10 @@ public class ExportPageFragment extends Fragment {
             }
         });
 
-
-
         edtDate.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
             @Override
             public boolean onQueryTextSubmit(String query) {
-                SimpleDateFormat minDate = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
+                SimpleDateFormat minDate = new SimpleDateFormat("yyyy-MM-d", Locale.US);
                 query = minDate.format(myCalendar.getTime());
                 tanggal1 = query;
                 if (tanggal1 != null && tanggal2 != null) {
@@ -242,7 +256,7 @@ public class ExportPageFragment extends Fragment {
             @Override
             public boolean onQueryTextChange(String newText) {
                 //search as you type
-                SimpleDateFormat minDate = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
+                SimpleDateFormat minDate = new SimpleDateFormat("yyyy-MM-d", Locale.US);
                 newText = minDate.format(myCalendar.getTime());
                 tanggal1 = newText;
                 if (tanggal1 != null && tanggal2 != null) {
@@ -264,7 +278,7 @@ public class ExportPageFragment extends Fragment {
             @Override
             public boolean onQueryTextSubmit(String query) {
                 //                    SimpleDateFormat maxDate = new SimpleDateFormat("d-M-yyyy", Locale.US).parse(query);
-                SimpleDateFormat maxDate = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
+                SimpleDateFormat maxDate = new SimpleDateFormat("yyyy-MM-d", Locale.US);
                 query = maxDate.format(myCalendar2.getTime());
                 tanggal2 = query;
                 if (tanggal1 != null && tanggal2 != null) {
@@ -283,7 +297,7 @@ public class ExportPageFragment extends Fragment {
             @Override
             public boolean onQueryTextChange(String newText) {
                 //search as you type
-                SimpleDateFormat maxDate = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
+                SimpleDateFormat maxDate = new SimpleDateFormat("yyyy-MM-d", Locale.US);
                 newText = maxDate.format(myCalendar2.getTime());
                 tanggal2 = newText;
 
@@ -316,7 +330,7 @@ public class ExportPageFragment extends Fragment {
 
     private void updateLabel() {
 
-        String myFormat = "yyyy-MM-dd";
+        String myFormat = "yyyy-MM-d";
         SimpleDateFormat sdf = new SimpleDateFormat(myFormat, Locale.US);
 
         String date = sdf.format(myCalendar.getTime());
@@ -327,7 +341,7 @@ public class ExportPageFragment extends Fragment {
 
 
     private void updateLabel2() {
-        String myFormat = "yyyy-MM-dd";
+        String myFormat = "yyyy-MM-d";
         SimpleDateFormat sdf = new SimpleDateFormat(myFormat, Locale.US);
 //        edtTanggal.setText(sdf.format(myCalendar2.getTime()));
         String tanggal = sdf.format(myCalendar2.getTime());
@@ -393,17 +407,86 @@ public class ExportPageFragment extends Fragment {
         int id = item.getItemId();
 
         if (id == R.id.action_export) {
-            //sql to csv file
-            if (checkStoragePermission()) {
-                //permission allowed
-                exportCSV();
-            } else {
-                requestStoragePermissionExport();
-            }
-        } else if (id == R.id.action_sort) {
+
+            final BottomSheetDialog bottomSheetDialog = new BottomSheetDialog(getActivity());
+            bottomSheetDialog.setContentView(R.layout.bottom_sheet_dialog);
+
+            bottomSheetDialog.setCanceledOnTouchOutside(false);
+
+            LinearLayout bottom_sheet_refresh = bottomSheetDialog.findViewById(R.id.bottom_sheet_refresh);
+            CardView btn_yes = bottomSheetDialog.findViewById(R.id.btn_yes);
+            CardView btn_cancel = bottomSheetDialog.findViewById(R.id.btn_cancel);
+            bottom_sheet_refresh.setVisibility(View.VISIBLE);
+
+            btn_yes.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+//                        fungsi yes pada bottom sheet
+                    //sql to csv file
+                    if (checkStoragePermission()) {
+                        //permission allowed
+                        exportCSV();
+                        bottomSheetDialog.hide();
+                    } else {
+                        requestStoragePermissionExport();
+                    }
+                }
+            });
+
+            btn_cancel.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+//                        fungsi cancel bottom sheet
+                    bottomSheetDialog.hide();
+                }
+            });
+            bottomSheetDialog.show();
+
+
+        }
+        if (id == R.id.action_exportXls) {
+
+            final BottomSheetDialog bottomSheetDialog = new BottomSheetDialog(getActivity());
+            bottomSheetDialog.setContentView(R.layout.bottom_sheet_dialog);
+
+            bottomSheetDialog.setCanceledOnTouchOutside(false);
+
+            LinearLayout bottom_sheet_refresh = bottomSheetDialog.findViewById(R.id.bottom_sheet_refresh);
+            CardView btn_yes = bottomSheetDialog.findViewById(R.id.btn_yes);
+            CardView btn_cancel = bottomSheetDialog.findViewById(R.id.btn_cancel);
+            bottom_sheet_refresh.setVisibility(View.VISIBLE);
+
+            btn_yes.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+//                        fungsi yes pada bottom sheet
+                    //sql to csv file
+                    if (checkStoragePermission()) {
+                        //permission allowed
+                        exportXls();
+                        bottomSheetDialog.hide();
+                    } else {
+                        requestStoragePermissionExport();
+                    }
+                }
+            });
+
+            btn_cancel.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+//                        fungsi cancel bottom sheet
+                    bottomSheetDialog.hide();
+                }
+            });
+            bottomSheetDialog.show();
+
+
+        }
+
+        if (id == R.id.action_sort) {
             //show sort options (show in dialog)
 //            sortOptionDialog();
-            loadRecords(orderByOldest);
+            loadRecords(orderByNewest);
         }
         if (item.getItemId() == android.R.id.home) {
 //            AlertDialog.Builder myAlert = new AlertDialog.Builder(mContext);
@@ -439,23 +522,24 @@ public class ExportPageFragment extends Fragment {
         return super.onOptionsItemSelected(item);
     }
 
-    private void sortOptionDialog() {
-        String[] options = {"Newest", "Oldest"};
-        //dialog
-        AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
-        builder.setTitle("Sort By")
-                .setItems(options, new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialogInterface, int which) {
-                        if (which == 0) {
-                            loadRecords(orderByNewest);
-                        } else if (which == 1) {
-                            loadRecords(orderByOldest);
-                        }
-                    }
-                })
-                .create().show();
-    }
+//
+//    private void sortOptionDialog() {
+//        String[] options = {"Newest", "Oldest"};
+//        //dialog
+//        AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
+//        builder.setTitle("Sort By")
+//                .setItems(options, new DialogInterface.OnClickListener() {
+//                    @Override
+//                    public void onClick(DialogInterface dialogInterface, int which) {
+//                        if (which == 0) {
+//                            loadRecords(orderByNewest);
+//                        } else if (which == 1) {
+//                            loadRecords(orderByNewest);
+//                        }
+//                    }
+//                })
+//                .create().show();
+//    }
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
@@ -478,6 +562,321 @@ public class ExportPageFragment extends Fragment {
 
     }
 
+    private void exportXls() {
+        Workbook workbook = new HSSFWorkbook();
+        Cell cell = null;
+        CellStyle cellStyle = workbook.createCellStyle();
+        cellStyle.setFillBackgroundColor(HSSFColor.SEA_GREEN.index);
+        cellStyle.setAlignment(HorizontalAlignment.CENTER);
+        cellStyle.setBorderBottom(BorderStyle.THICK);
+        cellStyle.setBorderLeft(BorderStyle.THICK);
+        cellStyle.setBorderRight(BorderStyle.THICK);
+        cellStyle.setBorderTop(BorderStyle.THICK);
+
+
+        CellStyle cellStyle1 = workbook.createCellStyle();
+        cellStyle1.setFillBackgroundColor(HSSFColor.SEA_GREEN.index);
+        cellStyle1.setAlignment(HorizontalAlignment.CENTER);
+        cellStyle1.setBorderBottom(BorderStyle.THIN);
+        cellStyle1.setBorderLeft(BorderStyle.THIN);
+        cellStyle1.setBorderRight(BorderStyle.THIN);
+        cellStyle1.setBorderTop(BorderStyle.THIN);
+
+        //get records
+        ArrayList<ModelRecord> recordsList = new ArrayList<>();
+        recordsList.clear();
+        recordsList = dbHelper.getAllRecords(orderByOldest);
+
+        //creating sheet
+        Sheet sheet = null;
+        sheet = workbook.createSheet("Data Scan");
+
+        //create row and column
+        Row row = null;
+        row = sheet.createRow(0);
+
+        cell = row.createCell(0);
+        cell.setCellValue("Id");
+        cell.setCellStyle(cellStyle);
+        cell = row.createCell(1);
+        cell.setCellValue("Bray1_P20");
+        cell.setCellStyle(cellStyle);
+        cell = row.createCell(2);
+        cell.setCellValue("Ca");
+        cell.setCellStyle(cellStyle);
+        cell = row.createCell(3);
+        cell.setCellValue("CLAY");
+        cell.setCellStyle(cellStyle);
+        cell = row.createCell(4);
+        cell.setCellValue("C_N");
+        cell.setCellStyle(cellStyle);
+        cell = row.createCell(5);
+        cell.setCellValue("HCl25_K2O");
+        cell.setCellStyle(cellStyle);
+        cell = row.createCell(6);
+        cell.setCellValue("HCl25_P2O5");
+        cell.setCellStyle(cellStyle);
+        cell = row.createCell(7);
+        cell.setCellValue("Jumlah");
+        cell.setCellStyle(cellStyle);
+        cell = row.createCell(8);
+        cell.setCellValue("K");
+        cell.setCellStyle(cellStyle);
+        cell = row.createCell(9);
+        cell.setCellValue("KB_adjusted");
+        cell.setCellStyle(cellStyle);
+        cell = row.createCell(10);
+        cell.setCellValue("KJELDAHL_N");
+        cell.setCellStyle(cellStyle);
+        cell = row.createCell(11);
+        cell.setCellValue("KTK");
+        cell.setCellStyle(cellStyle);
+        cell = row.createCell(12);
+        cell.setCellValue("Mg");
+        cell.setCellStyle(cellStyle);
+        cell = row.createCell(13);
+        cell.setCellValue("Morgan_K2O");
+        cell.setCellStyle(cellStyle);
+        cell = row.createCell(14);
+        cell.setCellValue("Na");
+        cell.setCellStyle(cellStyle);
+        cell = row.createCell(15);
+        cell.setCellValue("Olsen_P2O5");
+        cell.setCellStyle(cellStyle);
+        cell = row.createCell(16);
+        cell.setCellValue("PH_H2O");
+        cell.setCellStyle(cellStyle);
+        cell = row.createCell(17);
+        cell.setCellValue("PH_KCL");
+        cell.setCellStyle(cellStyle);
+        cell = row.createCell(18);
+        cell.setCellValue("RetensiP");
+        cell.setCellStyle(cellStyle);
+        cell = row.createCell(19);
+        cell.setCellValue("SAND");
+        cell.setCellStyle(cellStyle);
+        cell = row.createCell(20);
+        cell.setCellValue("SILT");
+        cell.setCellStyle(cellStyle);
+        cell = row.createCell(21);
+        cell.setCellValue("WBC");
+        cell.setCellStyle(cellStyle);
+        cell = row.createCell(22);
+        cell.setCellValue("Date");
+        cell.setCellStyle(cellStyle);
+        for (int i = 0; i < recordsList.size(); i++) {
+            if (i == 0) {
+//                int nextCell = ((i/i)-1);
+                row = sheet.createRow(i + 1);
+
+                cell = row.createCell(i);
+                cell.setCellValue("" + recordsList.get(i).getId());
+                cell.setCellStyle(cellStyle1);
+                cell = row.createCell(i + 1);
+                cell.setCellValue("" + recordsList.get(i).getBray());
+                cell.setCellStyle(cellStyle1);
+                cell = row.createCell(i + 2);
+                cell.setCellValue("" + recordsList.get(i).getCa());
+                cell.setCellStyle(cellStyle1);
+                cell = row.createCell(i + 3);
+                cell.setCellValue("" + recordsList.get(i).getClay());
+                cell.setCellStyle(cellStyle1);
+                cell = row.createCell(i + 4);
+                cell.setCellValue("" + recordsList.get(i).getCn());
+                cell.setCellStyle(cellStyle1);
+                cell = row.createCell(i + 5);
+                cell.setCellValue("" + recordsList.get(i).getHclk2o());
+                cell.setCellStyle(cellStyle1);
+                cell = row.createCell(i + 6);
+                cell.setCellValue("" + recordsList.get(i).getHclp2o5());
+                cell.setCellStyle(cellStyle1);
+                cell = row.createCell(i + 7);
+                cell.setCellValue("" + recordsList.get(i).getJumlah());
+                cell.setCellStyle(cellStyle1);
+                cell = row.createCell(i + 8);
+                cell.setCellValue("" + recordsList.get(i).getK());
+                cell.setCellStyle(cellStyle1);
+                cell = row.createCell(i + 9);
+                cell.setCellValue("" + recordsList.get(i).getKbadj());
+                cell.setCellStyle(cellStyle1);
+                cell = row.createCell(i + 10);
+                cell.setCellValue("" + recordsList.get(i).getKjeldahl());
+                cell.setCellStyle(cellStyle1);
+                cell = row.createCell(i + 11);
+                cell.setCellValue("" + recordsList.get(i).getKtk());
+                cell.setCellStyle(cellStyle1);
+                cell = row.createCell(i + 12);
+                cell.setCellValue("" + recordsList.get(i).getMg());
+                cell.setCellStyle(cellStyle1);
+                cell = row.createCell(i + 13);
+                cell.setCellValue("" + recordsList.get(i).getMorgan());
+                cell.setCellStyle(cellStyle1);
+                cell = row.createCell(i + 14);
+                cell.setCellValue("" + recordsList.get(i).getNa());
+                cell.setCellStyle(cellStyle1);
+                cell = row.createCell(i + 15);
+                cell.setCellValue("" + recordsList.get(i).getOlsen());
+                cell.setCellStyle(cellStyle1);
+                cell = row.createCell(i + 16);
+                cell.setCellValue("" + recordsList.get(i).getPhh2o());
+                cell.setCellStyle(cellStyle1);
+                cell = row.createCell(i + 17);
+                cell.setCellValue("" + recordsList.get(i).getPhkcl());
+                cell.setCellStyle(cellStyle1);
+                cell = row.createCell(i + 18);
+                cell.setCellValue("" + recordsList.get(i).getRetensip());
+                cell.setCellStyle(cellStyle1);
+                cell = row.createCell(i + 19);
+                cell.setCellValue("" + recordsList.get(i).getSand());
+                cell.setCellStyle(cellStyle1);
+                cell = row.createCell(i + 20);
+                cell.setCellValue("" + recordsList.get(i).getSilt());
+                cell.setCellStyle(cellStyle1);
+                cell = row.createCell(i + 21);
+                cell.setCellValue("" + recordsList.get(i).getWbc());
+                cell.setCellStyle(cellStyle1);
+                cell = row.createCell(i + 22);
+                cell.setCellValue("" + recordsList.get(i).getAddedTime());
+                cell.setCellStyle(cellStyle1);
+            }
+            if (i > 0) {
+                int nextCell = ((i / i) - 1);
+                row = sheet.createRow(i + 1);
+
+                cell = row.createCell(nextCell);
+                cell.setCellValue("" + recordsList.get(i).getId());
+                cell.setCellStyle(cellStyle1);
+                cell = row.createCell(nextCell + 1);
+                cell.setCellValue("" + recordsList.get(i).getBray());
+                cell.setCellStyle(cellStyle1);
+                cell = row.createCell(nextCell + 2);
+                cell.setCellValue("" + recordsList.get(i).getCa());
+                cell.setCellStyle(cellStyle1);
+                cell = row.createCell(nextCell + 3);
+                cell.setCellValue("" + recordsList.get(i).getClay());
+                cell.setCellStyle(cellStyle1);
+                cell = row.createCell(nextCell + 4);
+                cell.setCellValue("" + recordsList.get(i).getCn());
+                cell.setCellStyle(cellStyle1);
+                cell = row.createCell(nextCell + 5);
+                cell.setCellValue("" + recordsList.get(i).getHclk2o());
+                cell.setCellStyle(cellStyle1);
+                cell = row.createCell(nextCell + 6);
+                cell.setCellValue("" + recordsList.get(i).getHclp2o5());
+                cell.setCellStyle(cellStyle1);
+                cell = row.createCell(nextCell + 7);
+                cell.setCellValue("" + recordsList.get(i).getJumlah());
+                cell.setCellStyle(cellStyle1);
+                cell = row.createCell(nextCell + 8);
+                cell.setCellValue("" + recordsList.get(i).getK());
+                cell.setCellStyle(cellStyle1);
+                cell = row.createCell(nextCell + 9);
+                cell.setCellValue("" + recordsList.get(i).getKbadj());
+                cell.setCellStyle(cellStyle1);
+                cell = row.createCell(nextCell + 10);
+                cell.setCellValue("" + recordsList.get(i).getKjeldahl());
+                cell.setCellStyle(cellStyle1);
+                cell = row.createCell(nextCell + 11);
+                cell.setCellValue("" + recordsList.get(i).getKtk());
+                cell.setCellStyle(cellStyle1);
+                cell = row.createCell(nextCell + 12);
+                cell.setCellValue("" + recordsList.get(i).getMg());
+                cell.setCellStyle(cellStyle1);
+                cell = row.createCell(nextCell + 13);
+                cell.setCellValue("" + recordsList.get(i).getMorgan());
+                cell.setCellStyle(cellStyle1);
+                cell = row.createCell(nextCell + 14);
+                cell.setCellValue("" + recordsList.get(i).getNa());
+                cell.setCellStyle(cellStyle1);
+                cell = row.createCell(nextCell + 15);
+                cell.setCellValue("" + recordsList.get(i).getOlsen());
+                cell.setCellStyle(cellStyle1);
+                cell = row.createCell(nextCell + 16);
+                cell.setCellValue("" + recordsList.get(i).getPhh2o());
+                cell.setCellStyle(cellStyle1);
+                cell = row.createCell(nextCell + 17);
+                cell.setCellValue("" + recordsList.get(i).getPhkcl());
+                cell.setCellStyle(cellStyle1);
+                cell = row.createCell(nextCell + 18);
+                cell.setCellValue("" + recordsList.get(i).getRetensip());
+                cell.setCellStyle(cellStyle1);
+                cell = row.createCell(nextCell + 19);
+                cell.setCellValue("" + recordsList.get(i).getSand());
+                cell.setCellStyle(cellStyle1);
+                cell = row.createCell(nextCell + 20);
+                cell.setCellValue("" + recordsList.get(i).getSilt());
+                cell.setCellStyle(cellStyle1);
+                cell = row.createCell(nextCell + 21);
+                cell.setCellValue("" + recordsList.get(i).getWbc());
+                cell.setCellStyle(cellStyle1);
+                cell = row.createCell(nextCell + 22);
+                cell.setCellValue("" + recordsList.get(i).getAddedTime());
+                cell.setCellStyle(cellStyle1);
+            }
+        }
+
+
+        sheet.setColumnWidth(0, (10 * 200));
+        sheet.setColumnWidth(1, (10 * 500));
+        sheet.setColumnWidth(2, (10 * 500));
+        sheet.setColumnWidth(3, (10 * 500));
+        sheet.setColumnWidth(4, (10 * 500));
+        sheet.setColumnWidth(5, (10 * 500));
+        sheet.setColumnWidth(6, (10 * 500));
+        sheet.setColumnWidth(7, (10 * 500));
+        sheet.setColumnWidth(8, (10 * 500));
+        sheet.setColumnWidth(9, (10 * 500));
+        sheet.setColumnWidth(10, (10 * 500));
+        sheet.setColumnWidth(11, (10 * 500));
+        sheet.setColumnWidth(12, (10 * 500));
+        sheet.setColumnWidth(13, (10 * 500));
+        sheet.setColumnWidth(14, (10 * 500));
+        sheet.setColumnWidth(15, (10 * 500));
+        sheet.setColumnWidth(16, (10 * 500));
+        sheet.setColumnWidth(17, (10 * 500));
+        sheet.setColumnWidth(18, (10 * 500));
+        sheet.setColumnWidth(19, (10 * 500));
+        sheet.setColumnWidth(20, (10 * 500));
+        sheet.setColumnWidth(21, (10 * 500));
+        sheet.setColumnWidth(22, (10 * 500));
+        sheet.setColumnWidth(23, (10 * 500));
+
+
+        File folder = new File(Environment.getExternalStorageDirectory() + "/" + "Neospectra"); // Neospectra is folder name
+
+        boolean isFolderCreated = false;
+        if (!folder.exists()) {
+            isFolderCreated = folder.mkdir(); //create folder if not exists
+        }
+        Log.d("CSC_TAG", "export To Excel: " + isFolderCreated);
+
+        //file name
+        String excelFileName = "Neospectra.xls";
+
+
+        //complate path and name
+        String filePathAndName = folder.toString() + "/" + excelFileName;
+
+
+//        File file = new File(getActivity().getExternalFilesDir(null), "Neospectra.xls");
+        FileOutputStream fileOutputStream = null;
+
+        try {
+            fileOutputStream = new FileOutputStream(filePathAndName);
+            workbook.write(fileOutputStream);
+            Toast.makeText(mContext, "Exported to : " + filePathAndName, Toast.LENGTH_SHORT).show();
+        } catch (IOException e) {
+            e.printStackTrace();
+            Toast.makeText(mContext, "Neospectra.xls Not Created", Toast.LENGTH_SHORT).show();
+            try {
+                fileOutputStream.close();
+            } catch (IOException ex) {
+
+            }
+        }
+
+    }
+
     private void exportCSV() {
         //path of csv file
 
@@ -491,10 +890,12 @@ public class ExportPageFragment extends Fragment {
         Log.d("CSC_TAG", "exportCSV: " + isFolderCreated);
 
         //file name
-        String csvFileName = "NEO.csv";
+        String csvFileName = "Neospectra.csv";
+
 
         //complate path and name
         String filePathAndName = folder.toString() + "/" + csvFileName;
+
 
         //get records
         ArrayList<ModelRecord> recordsList = new ArrayList<>();

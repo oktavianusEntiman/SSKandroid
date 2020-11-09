@@ -47,6 +47,9 @@ import com.android.volley.toolbox.JsonObjectRequest;
 import com.android.volley.toolbox.JsonRequest;
 import com.android.volley.toolbox.StringRequest;
 import com.android.volley.toolbox.Volley;
+import com.balittanah.gravicode.pkdss.DataMappingNPK;
+import com.balittanah.gravicode.pkdss.FertilizerInfo;
+import com.balittanah.gravicode.pkdss.LogicEvaluator;
 import com.github.ybq.android.spinkit.style.Wave;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -56,7 +59,7 @@ import com.jjoe64.graphview.series.LineGraphSeries;
 import com.si_ware.neospectra.Activities.ConfigureActivity;
 import com.si_ware.neospectra.Activities.ConnectActivity;
 import com.si_ware.neospectra.Activities.HomeActivity;
-import com.si_ware.neospectra.Activities.Interfaces.Objects;
+import com.si_ware.neospectra.Activities.Interfaces.MyObj;
 import com.si_ware.neospectra.Activities.IntroActivity;
 import com.si_ware.neospectra.BluetoothSDK.SWS_P3API;
 import com.si_ware.neospectra.ConfigurableProperties;
@@ -68,22 +71,32 @@ import com.si_ware.neospectra.R;
 import com.si_ware.neospectra.ResultPrediction;
 import com.si_ware.neospectra.Scan.Presenter.ScanPresenter;
 
+import org.ini4j.Ini;
+import org.ini4j.IniPreferences;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.File;
+import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.io.IOException;
 import java.net.URI;
 import java.util.TimeZone;
+import java.util.prefs.Preferences;
 
 import com.google.gson.Gson;
+import com.balittanah.gravicode.pkdss.FertilizerCalculator;
+import com.balittanah.gravicode.pkdss.ModelRunner;
+import com.balittanah.gravicode.pkdss.Resources;
+import com.balittanah.gravicode.pkdss.model.InferenceResult;
 import com.si_ware.neospectra.dbtable.DBHelper;
 
 import static com.si_ware.neospectra.Global.GlobalVariables.MAX_SCANNER_MEMORY;
@@ -136,16 +149,13 @@ public class ScanPageFragment extends Fragment {
     public double[] reading;
     ProgressBar progressBar;
     private double[] ySend;
-    private Objects getset = new Objects();
+    private MyObj myObj = new MyObj();
     private float[] yValsnew;
-    private DBHelper dbHelper;
     private String bray, ca, clay, cn, hclk2o, hclp2o5, jumlah, k, kbadj, kjelhal, ktk, mg, morgan, na, olsen, phh2o, phkcl, retensip,
             sand, silt, wbc;
+    private DBHelper dbHelper;
 
-    String[] Resolution =
-            {
-                    "1", "2", "3"
-            };
+    String[] Resolution = {"1", "2", "3"};
     String[] Optical = {"2", "4", "6", "8", "10"};
 
     RequestQueue queue;
@@ -163,6 +173,9 @@ public class ScanPageFragment extends Fragment {
         final Drawable upArrow = getResources().getDrawable(R.drawable.ic_keyboard_arrow_left);
 
         queue = Volley.newRequestQueue(getActivity());
+        queue.getCache().clear();
+
+        dbHelper = new DBHelper(getActivity());
 
         LocalBroadcastManager.getInstance(getActivity()).registerReceiver(mMessageReceiver,
                 new IntentFilter(GlobalVariables.HOME_INTENT_ACTION));
@@ -175,9 +188,9 @@ public class ScanPageFragment extends Fragment {
         ((AppCompatActivity) getActivity()).getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         ((AppCompatActivity) getActivity()).getSupportActionBar().setDisplayShowHomeEnabled(true);
 
-        if (bluetoothAPI == null) {
-            bluetoothAPI = new SWS_P3API(getActivity(), mContext);
-        }
+//        if (bluetoothAPI == null) {
+//            bluetoothAPI = new SWS_P3API(getActivity(), mContext);
+//        }
         mContext = getActivity();
 
         scanPresenter = new ScanPresenter();
@@ -219,7 +232,7 @@ public class ScanPageFragment extends Fragment {
         btnRefresh.setCardBackgroundColor(Color.parseColor("#0A376A"));
         btnScan.setEnabled(false);
         btnScan.setCardBackgroundColor(Color.parseColor("#0A376A"));
-        btnProcess.setEnabled(false);
+        btnProcess.setEnabled(true);
         btnProcess.setCardBackgroundColor(Color.parseColor("#0A376A"));
 
         // Get all needed configuration settings
@@ -641,7 +654,9 @@ public class ScanPageFragment extends Fragment {
             btnScan.setCardBackgroundColor(Color.parseColor("#0A376A"));
             btnScan.setEnabled(false);
 //            btnViewScan.setEnabled(false);
-
+            progressBar.setVisibility(View.GONE);
+            lProgress.setVisibility(View.GONE);
+            lUtama.setVisibility(View.VISIBLE);
         }
     }
 
@@ -822,16 +837,16 @@ public class ScanPageFragment extends Fragment {
             scanPresenter = new ScanPresenter();
         }
         // Don't complete the process if the device not connected
-//        if (bluetoothAPI == null || !bluetoothAPI.isDeviceConnected()) {
-//            showAlertMessage(getActivity(),
-//                    "Device not connected",
-//                    "Please! Ensure that you have a connected device firstly");
-//
-//            Intent iMain = new Intent(mContext, ConnectActivity.class);
-//            iMain.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-//            startActivity(iMain);
-//            return;
-//        }
+        if (bluetoothAPI == null || !bluetoothAPI.isDeviceConnected()) {
+            showAlertMessage(getActivity(),
+                    "Device not connected",
+                    "Please! Ensure that you have a connected device firstly");
+
+            Intent iMain = new Intent(mContext, IntroActivity.class);
+            iMain.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            startActivity(iMain);
+            return;
+        }
         System.out.println("error_sensor_reading= " + error_sensor_reading);
 
         if (error_sensor_reading == true) {
@@ -849,15 +864,15 @@ public class ScanPageFragment extends Fragment {
             scanPresenter = new ScanPresenter();
         }
         // Don't complete the process if the device not connected
-//        if (bluetoothAPI == null || !bluetoothAPI.isDeviceConnected()) {
-//            showAlertMessage(getActivity(),
-//                    "Device not connected",
-//                    "Please! Ensure that you have a connected device firstly");
-//            Intent iMain = new Intent(mContext, ConnectActivity.class);
-//            iMain.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-//            startActivity(iMain);
-//            return;
-//        }
+        if (bluetoothAPI == null || !bluetoothAPI.isDeviceConnected()) {
+            showAlertMessage(getActivity(),
+                    "Device not connected",
+                    "Please! Ensure that you have a connected device firstly");
+            Intent iMain = new Intent(mContext, IntroActivity.class);
+            iMain.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            startActivity(iMain);
+            return;
+        }
         System.out.println("error_sensor_reading= " + error_sensor_reading);
         if (error_sensor_reading == true) {
             System.out.println("error_sensor_reading==true");
@@ -978,11 +993,15 @@ public class ScanPageFragment extends Fragment {
 
     public void send() {
         //final String reflect = String.valueOf(getReflectance());
-        //final String reflect = "[1.4923595577160977, 1.4858127248658966, 1.483462090254477, 1.4811798041653559, 1.478962913306713, 1.4855769966447907, 1.4980369452002196, 1.5107358150374268, 1.5237569761463843, 1.5439514620142998, 1.5649235190483481, 1.5867448877083867, 1.6051176087587002, 1.6177447487272167, 1.6306515729737083, 1.6438533274801315, 1.6400895455127638, 1.632582440983541, 1.6252176612788953, 1.6198725907564453, 1.6213354492364858, 1.6228053264183926, 1.6242822812641795, 1.6099011319227792, 1.5868067126139442, 1.5648237847516457, 1.544745673922674, 1.5636719309528466, 1.5836740725983514, 1.6048689016001756, 1.5833574932821064, 1.5116491299523145, 1.4495783456215772, 1.3947959447352576, 1.2918057677397976, 1.1992397828844443, 1.122286417387327, 1.058209672376652, 1.007455383951984, 0.9616205980336366, 0.919799976119593, 0.8816754541295957, 0.846415634923224, 0.8134035619782354, 0.7825288802788117, 0.7581106852285208, 0.7347173332245207, 0.712253776941942, 0.6959946688831977, 0.6868673557709583, 0.6777822485848614, 0.6687370993128493, 0.6634532674684838, 0.6588496038600996, 0.6542135218391817, 0.650439036485605, 0.6494303714709287, 0.6484085532337851, 0.6473733189682102, 0.6505096086613632, 0.6560675123165075, 0.6617844918500856, 0.6678320064423794, 0.6773980334664261, 0.687332888702839, 0.6976609392195393, 0.7077864440092541, 0.7175350110240191, 0.7276659878530138, 0.73820535178606, 0.7374533387312248, 0.7346946485373929, 0.7319157493729622, 0.7308950756427758, 0.7351101120376661, 0.7394239441643337, 0.7438404496531559, 0.7388678656148142, 0.7290543091186971, 0.7193294027380683, 0.7099151909196766, 0.70403827891758, 0.6981470703452413, 0.6922410365016064, 0.6903190692651037, 0.6930791228458978, 0.6959051509864557, 0.6987995815588827, 0.6956334462854157, 0.6914799136196662, 0.6872836231999556, 0.6848054759532685, 0.6871663435453333, 0.6895964758206469, 0.6920991381726384, 0.6881997514678868, 0.6811207774698556, 0.6740306857884835, 0.6675105117176813, 0.6683854189637848, 0.6692756243091352, 0.6701814495037131, 0.6716844131505948, 0.6738771613724109, 0.6761320170891266, 0.678451602444802, 0.6948243849381603, 0.7143272063658798, 0.7352377119243911, 0.7538648675483346, 0.7634400480774127, 0.7734757182625362, 0.78400913200663, 0.7918237369037693, 0.7984098355956745, 0.8052408495927444, 0.8111444969731852, 0.8044351815029898, 0.7976787256758275, 0.7908738034859917, 0.7841548107916759, 0.7775187541599177, 0.770818732192338, 0.7640528921612861, 0.7977884610770649, 0.8411180402148933, 0.8905199272907379, 0.9244988850601861, 0.9057541640924206, 0.887330474469635, 0.8692037451604195, 0.8856491935982594, 0.9199039669891226, 0.9579840144303058, 1.0003030333095635, 1.0438001310390779, 1.0933407551068128, 1.1506824136223224, 1.0894765877615242, 0.9454627210723413, 0.8355442387791785, 0.7462631846605977, 0.6637432281323373, 0.5924926552028972, 0.5301453236911169, 0.48125073981115035, 0.45066956195723673, 0.4216368791132292, 0.3939775868484456, 0.37149194190930995, 0.3513256753499769, 0.3317250220153034, 0.3131407785267416, 0.2989077723773725, 0.28493519458393496, 0.27120896669320177, 0.2629987969754946, 0.25983954212696614, 0.25664953991987993, 0.25342813762191524, 0.24960152947235756, 0.24568123315833998, 0.24171939608237425, 0.238101623523044, 0.23527594257716072, 0.2324141312944353, 0.2295155441563728, 0.22782156831320188, 0.22658716675319324, 0.22533190884787488, 0.22403231016346525, 0.22254695182739576, 0.22103637366931686, 0.21949994774221085, 0.21904981271046203, 0.219609059412783, 0.22018246090487753, 0.22077017247296676, 0.22303717826125743, 0.22549986941964445, 0.22803341709617733, 0.23118147780444603, 0.23555121429637055, 0.24007856001194133, 0.24477213503225362, 0.25245972876455547, 0.26152510502500387, 0.2709911285747663, 0.27890262661229726, 0.274278608942148, 0.2695808791948591, 0.26480715500720775, 0.2604653383026738, 0.25650110129093534, 0.2524811584144779, 0.24840397041427206, 0.24886572731886195, 0.249638296295987, 0.25043289043817996, 0.25154103107053394, 0.2532471330561095, 0.25500381041892867, 0.25681361748936843, 0.26073752051034915, 0.2655234002293547, 0.27049202702863523, 0.27559916289715847, 0.2805806171691589, 0.28575828540902476, 0.291145055803157, 0.30060574516686345, 0.3138064791234264, 0.3277592057718932, 0.3425384322994569, 0.3476534333532286, 0.35243566134093157, 0.3574020646420728, 0.3654625311350187, 0.3793530655132743, 0.39404055914896874, 0.40960457464744937, 0.4157154859762159, 0.41870619427713973, 0.4218053699579598, 0.4258835104095832, 0.43476182516063017, 0.4440338252839598, 0.453728497962529, 0.45411403013578727, 0.4469808275076322, 0.43980396196776317, 0.4325819393582788, 0.42045962461476527, 0.4082495740307261, 0.3961233724474999, 0.3943631551660014, 0.41103574614622995, 0.42884897199882216, 0.44794059373982753, 0.4249756272601481, 0.3909625413993561, 0.3586987573477003, 0.3284363733676303, 0.30166360729313274, 0.27594451540608794, 0.25117512039482465, 0.23389122887124383, 0.22169775881291762, 0.20952791502980017, 0.19737754868412105, 0.1891637996614425, 0.18098640907035374, 0.1727528880332392, 0.16741208053340115, 0.16685723288734378, 0.16629203228837086, 0.16571618563446414]";
-//        double[] reflectance = new double[]{1.4923595577160977, 1.4858127248658966, 1.483462090254477, 1.4811798041653559, 1.478962913306713, 1.4855769966447907, 1.4980369452002196, 1.5107358150374268, 1.5237569761463843, 1.5439514620142998, 1.5649235190483481, 1.5867448877083867, 1.6051176087587002, 1.6177447487272167, 1.6306515729737083, 1.6438533274801315, 1.6400895455127638, 1.632582440983541, 1.6252176612788953, 1.6198725907564453, 1.6213354492364858, 1.6228053264183926, 1.6242822812641795, 1.6099011319227792, 1.5868067126139442, 1.5648237847516457, 1.544745673922674, 1.5636719309528466, 1.5836740725983514, 1.6048689016001756, 1.5833574932821064, 1.5116491299523145, 1.4495783456215772, 1.3947959447352576, 1.2918057677397976, 1.1992397828844443, 1.122286417387327, 1.058209672376652, 1.007455383951984, 0.9616205980336366, 0.919799976119593, 0.8816754541295957, 0.846415634923224, 0.8134035619782354, 0.7825288802788117, 0.7581106852285208, 0.7347173332245207, 0.712253776941942, 0.6959946688831977, 0.6868673557709583, 0.6777822485848614, 0.6687370993128493, 0.6634532674684838, 0.6588496038600996, 0.6542135218391817, 0.650439036485605, 0.6494303714709287, 0.6484085532337851, 0.6473733189682102, 0.6505096086613632, 0.6560675123165075, 0.6617844918500856, 0.6678320064423794, 0.6773980334664261, 0.687332888702839, 0.6976609392195393, 0.7077864440092541, 0.7175350110240191, 0.7276659878530138, 0.73820535178606, 0.7374533387312248, 0.7346946485373929, 0.7319157493729622, 0.7308950756427758, 0.7351101120376661, 0.7394239441643337, 0.7438404496531559, 0.7388678656148142, 0.7290543091186971, 0.7193294027380683, 0.7099151909196766, 0.70403827891758, 0.6981470703452413, 0.6922410365016064, 0.6903190692651037, 0.6930791228458978, 0.6959051509864557, 0.6987995815588827, 0.6956334462854157, 0.6914799136196662, 0.6872836231999556, 0.6848054759532685, 0.6871663435453333, 0.6895964758206469, 0.6920991381726384, 0.6881997514678868, 0.6811207774698556, 0.6740306857884835, 0.6675105117176813, 0.6683854189637848, 0.6692756243091352, 0.6701814495037131, 0.6716844131505948, 0.6738771613724109, 0.6761320170891266, 0.678451602444802, 0.6948243849381603, 0.7143272063658798, 0.7352377119243911, 0.7538648675483346, 0.7634400480774127, 0.7734757182625362, 0.78400913200663, 0.7918237369037693, 0.7984098355956745, 0.8052408495927444, 0.8111444969731852, 0.8044351815029898, 0.7976787256758275, 0.7908738034859917, 0.7841548107916759, 0.7775187541599177, 0.770818732192338, 0.7640528921612861, 0.7977884610770649, 0.8411180402148933, 0.8905199272907379, 0.9244988850601861, 0.9057541640924206, 0.887330474469635, 0.8692037451604195, 0.8856491935982594, 0.9199039669891226, 0.9579840144303058, 1.0003030333095635, 1.0438001310390779, 1.0933407551068128, 1.1506824136223224, 1.0894765877615242, 0.9454627210723413, 0.8355442387791785, 0.7462631846605977, 0.6637432281323373, 0.5924926552028972, 0.5301453236911169, 0.48125073981115035, 0.45066956195723673, 0.4216368791132292, 0.3939775868484456, 0.37149194190930995, 0.3513256753499769, 0.3317250220153034, 0.3131407785267416, 0.2989077723773725, 0.28493519458393496, 0.27120896669320177, 0.2629987969754946, 0.25983954212696614, 0.25664953991987993, 0.25342813762191524, 0.24960152947235756, 0.24568123315833998, 0.24171939608237425, 0.238101623523044, 0.23527594257716072, 0.2324141312944353, 0.2295155441563728, 0.22782156831320188, 0.22658716675319324, 0.22533190884787488, 0.22403231016346525, 0.22254695182739576, 0.22103637366931686, 0.21949994774221085, 0.21904981271046203, 0.219609059412783, 0.22018246090487753, 0.22077017247296676, 0.22303717826125743, 0.22549986941964445, 0.22803341709617733, 0.23118147780444603, 0.23555121429637055, 0.24007856001194133, 0.24477213503225362, 0.25245972876455547, 0.26152510502500387, 0.2709911285747663, 0.27890262661229726, 0.274278608942148, 0.2695808791948591, 0.26480715500720775, 0.2604653383026738, 0.25650110129093534, 0.2524811584144779, 0.24840397041427206, 0.24886572731886195, 0.249638296295987, 0.25043289043817996, 0.25154103107053394, 0.2532471330561095, 0.25500381041892867, 0.25681361748936843, 0.26073752051034915, 0.2655234002293547, 0.27049202702863523, 0.27559916289715847, 0.2805806171691589, 0.28575828540902476, 0.291145055803157, 0.30060574516686345, 0.3138064791234264, 0.3277592057718932, 0.3425384322994569, 0.3476534333532286, 0.35243566134093157, 0.3574020646420728, 0.3654625311350187, 0.3793530655132743, 0.39404055914896874, 0.40960457464744937, 0.4157154859762159, 0.41870619427713973, 0.4218053699579598, 0.4258835104095832, 0.43476182516063017, 0.4440338252839598, 0.453728497962529, 0.45411403013578727, 0.4469808275076322, 0.43980396196776317, 0.4325819393582788, 0.42045962461476527, 0.4082495740307261, 0.3961233724474999, 0.3943631551660014, 0.41103574614622995, 0.42884897199882216, 0.44794059373982753, 0.4249756272601481, 0.3909625413993561, 0.3586987573477003, 0.3284363733676303, 0.30166360729313274, 0.27594451540608794, 0.25117512039482465, 0.23389122887124383, 0.22169775881291762, 0.20952791502980017, 0.19737754868412105, 0.1891637996614425, 0.18098640907035374, 0.1727528880332392, 0.16741208053340115, 0.16685723288734378, 0.16629203228837086, 0.16571618563446414};
-        double[] reflectance = getReflectance();
-//        Log.e("reflectane : ", Arrays.toString(reflectance));
-//        Log.e("jumlah array", String.valueOf(reflectance.length));
+        // sample static data
+        double[] reflectance = new double[]{1.4923595577160977, 1.4858127248658966, 1.483462090254477, 1.4811798041653559, 1.478962913306713, 1.4855769966447907, 1.4980369452002196, 1.5107358150374268, 1.5237569761463843, 1.5439514620142998, 1.5649235190483481, 1.5867448877083867, 1.6051176087587002, 1.6177447487272167, 1.6306515729737083, 1.6438533274801315, 1.6400895455127638, 1.632582440983541, 1.6252176612788953, 1.6198725907564453, 1.6213354492364858, 1.6228053264183926, 1.6242822812641795, 1.6099011319227792, 1.5868067126139442, 1.5648237847516457, 1.544745673922674, 1.5636719309528466, 1.5836740725983514, 1.6048689016001756, 1.5833574932821064, 1.5116491299523145, 1.4495783456215772, 1.3947959447352576, 1.2918057677397976, 1.1992397828844443, 1.122286417387327, 1.058209672376652, 1.007455383951984, 0.9616205980336366, 0.919799976119593, 0.8816754541295957, 0.846415634923224, 0.8134035619782354, 0.7825288802788117, 0.7581106852285208, 0.7347173332245207, 0.712253776941942, 0.6959946688831977, 0.6868673557709583, 0.6777822485848614, 0.6687370993128493, 0.6634532674684838, 0.6588496038600996, 0.6542135218391817, 0.650439036485605, 0.6494303714709287, 0.6484085532337851, 0.6473733189682102, 0.6505096086613632, 0.6560675123165075, 0.6617844918500856, 0.6678320064423794, 0.6773980334664261, 0.687332888702839, 0.6976609392195393, 0.7077864440092541, 0.7175350110240191, 0.7276659878530138, 0.73820535178606, 0.7374533387312248, 0.7346946485373929, 0.7319157493729622, 0.7308950756427758, 0.7351101120376661, 0.7394239441643337, 0.7438404496531559, 0.7388678656148142, 0.7290543091186971, 0.7193294027380683, 0.7099151909196766, 0.70403827891758, 0.6981470703452413, 0.6922410365016064, 0.6903190692651037, 0.6930791228458978, 0.6959051509864557, 0.6987995815588827, 0.6956334462854157, 0.6914799136196662, 0.6872836231999556, 0.6848054759532685, 0.6871663435453333, 0.6895964758206469, 0.6920991381726384, 0.6881997514678868, 0.6811207774698556, 0.6740306857884835, 0.6675105117176813, 0.6683854189637848, 0.6692756243091352, 0.6701814495037131, 0.6716844131505948, 0.6738771613724109, 0.6761320170891266, 0.678451602444802, 0.6948243849381603, 0.7143272063658798, 0.7352377119243911, 0.7538648675483346, 0.7634400480774127, 0.7734757182625362, 0.78400913200663, 0.7918237369037693, 0.7984098355956745, 0.8052408495927444, 0.8111444969731852, 0.8044351815029898, 0.7976787256758275, 0.7908738034859917, 0.7841548107916759, 0.7775187541599177, 0.770818732192338, 0.7640528921612861, 0.7977884610770649, 0.8411180402148933, 0.8905199272907379, 0.9244988850601861, 0.9057541640924206, 0.887330474469635, 0.8692037451604195, 0.8856491935982594, 0.9199039669891226, 0.9579840144303058, 1.0003030333095635, 1.0438001310390779, 1.0933407551068128, 1.1506824136223224, 1.0894765877615242, 0.9454627210723413, 0.8355442387791785, 0.7462631846605977, 0.6637432281323373, 0.5924926552028972, 0.5301453236911169, 0.48125073981115035, 0.45066956195723673, 0.4216368791132292, 0.3939775868484456, 0.37149194190930995, 0.3513256753499769, 0.3317250220153034, 0.3131407785267416, 0.2989077723773725, 0.28493519458393496, 0.27120896669320177, 0.2629987969754946, 0.25983954212696614, 0.25664953991987993, 0.25342813762191524, 0.24960152947235756, 0.24568123315833998, 0.24171939608237425, 0.238101623523044, 0.23527594257716072, 0.2324141312944353, 0.2295155441563728, 0.22782156831320188, 0.22658716675319324, 0.22533190884787488, 0.22403231016346525, 0.22254695182739576, 0.22103637366931686, 0.21949994774221085, 0.21904981271046203, 0.219609059412783, 0.22018246090487753, 0.22077017247296676, 0.22303717826125743, 0.22549986941964445, 0.22803341709617733, 0.23118147780444603, 0.23555121429637055, 0.24007856001194133, 0.24477213503225362, 0.25245972876455547, 0.26152510502500387, 0.2709911285747663, 0.27890262661229726, 0.274278608942148, 0.2695808791948591, 0.26480715500720775, 0.2604653383026738, 0.25650110129093534, 0.2524811584144779, 0.24840397041427206, 0.24886572731886195, 0.249638296295987, 0.25043289043817996, 0.25154103107053394, 0.2532471330561095, 0.25500381041892867, 0.25681361748936843, 0.26073752051034915, 0.2655234002293547, 0.27049202702863523, 0.27559916289715847, 0.2805806171691589, 0.28575828540902476, 0.291145055803157, 0.30060574516686345, 0.3138064791234264, 0.3277592057718932, 0.3425384322994569, 0.3476534333532286, 0.35243566134093157, 0.3574020646420728, 0.3654625311350187, 0.3793530655132743, 0.39404055914896874, 0.40960457464744937, 0.4157154859762159, 0.41870619427713973, 0.4218053699579598, 0.4258835104095832, 0.43476182516063017, 0.4440338252839598, 0.453728497962529, 0.45411403013578727, 0.4469808275076322, 0.43980396196776317, 0.4325819393582788, 0.42045962461476527, 0.4082495740307261, 0.3961233724474999, 0.3943631551660014, 0.41103574614622995, 0.42884897199882216, 0.44794059373982753, 0.4249756272601481, 0.3909625413993561, 0.3586987573477003, 0.3284363733676303, 0.30166360729313274, 0.27594451540608794, 0.25117512039482465, 0.23389122887124383, 0.22169775881291762, 0.20952791502980017, 0.19737754868412105, 0.1891637996614425, 0.18098640907035374, 0.1727528880332392, 0.16741208053340115, 0.16685723288734378, 0.16629203228837086, 0.16571618563446414};
+//        double[] reflectance = getReflectance();
+
+        if (reflectance == null) {
+            Toast.makeText(getActivity(), "Sorry can't connect to device", Toast.LENGTH_LONG).show();
+            return;
+        }
+
         JSONArray jsonArray = new JSONArray();
         JSONObject jsonObject = new JSONObject();
         try {
@@ -992,11 +1011,11 @@ public class ScanPageFragment extends Fragment {
             jsonObject.put("reflectance", jsonArray);
         } catch (JSONException e) {
             e.getStackTrace();
+            Toast.makeText(getActivity(), "Sorry we got some error : " + e.getMessage(), Toast.LENGTH_LONG).show();
+            return;
         }
         final String mRequestBody = jsonObject.toString();
         String URL = ConfigurableProperties.apiService;
-
-//        Toast.makeText(mContext, getset.getReflectance(), Toast.LENGTH_SHORT).show();
 
         Wave rotatingCircle = new Wave();
         progressBar.setVisibility(View.VISIBLE);
@@ -1016,20 +1035,25 @@ public class ScanPageFragment extends Fragment {
                             // manipulate JSONObject to JAVAObject
                             Gson gson = new Gson();
                             OutputData outputData = gson.fromJson(jsonObject.toString(), OutputData.class);
-                            // set static DataElements
-                            setDataElement(outputData.data);
 
-                            inputData();
+                            if (!outputData.isSucceed) {
+                                Toast.makeText(getActivity(), outputData.errorMessage, Toast.LENGTH_LONG).show();
+                            } else {
+                                // set static DataElements
+                                setDataElement(outputData.data);
+                                inputData();
+                                Calculator();
+                                Toast.makeText(getActivity(), "Process success", Toast.LENGTH_LONG).show();
+                            }
 
-
-                            Toast.makeText(getActivity(), "RESPONSE:" + jsonObject, Toast.LENGTH_LONG).show();
-                            Log.e("response:", response);
                             lUtama.setVisibility(View.VISIBLE);
                             lProgress.setVisibility(View.GONE);
                             progressBar.setVisibility(View.GONE);
                             getActivity().getWindow().clearFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE);
                         } catch (Exception e) {
                             e.printStackTrace();
+                            Toast.makeText(getActivity(), "Sorry we got some error :" + e.getMessage(), Toast.LENGTH_LONG).show();
+                            return;
                         }
                     }
                 }, new Response.ErrorListener() {
@@ -1063,38 +1087,136 @@ public class ScanPageFragment extends Fragment {
         queue.add(stringRequest);
     }
 
-<<<<<<< HEAD
+    public void setDataElement(ResultPrediction[] datas) {
+        for (int i = 0; i < datas.length; i++) {
+            ResultPrediction rp = datas[i];
+            if (rp.elementName.equals("PH_H2O")) {
+                DataElements.setPhH2o(rp.elementValue);
+                myObj.setPhh2o(String.valueOf(rp.elementValue));
+//                phh2o = (Float.toString(DataElements.getPhH2o()));
+            }
+
+            if (rp.elementName.equals("PH_KCL")) {
+                DataElements.setPhKcl(rp.elementValue);
+//                phkcl = (Float.toString(DataElements.getPhKcl()));
+                myObj.setPhkcl(String.valueOf(rp.elementValue));
+
+            }
+            //
+            if (rp.elementName.equals("C_N")) {
+                DataElements.setCN(rp.elementValue);
+//                cn = (Float.toString(DataElements.getCN()));
+                myObj.setCn(String.valueOf(rp.elementValue));
+
+            }
+            //
+            if (rp.elementName.equals("KJELDAHL_N")) {
+                DataElements.setKjeldahlN(rp.elementValue);
+//                kjelhal = (Float.toString(DataElements.getKjeldahlN()));
+                myObj.setKjelhal(String.valueOf(rp.elementValue));
+            }
+            //
+            if (rp.elementName.equals("HCl25_P2O5")) {
+                DataElements.setHCl25P2O5(rp.elementValue);
+//                hclp2o5 = (Float.toString(DataElements.getHCl25P2O5()));
+                myObj.setHclp2o5(String.valueOf(rp.elementValue));
+            }
+            //
+            if (rp.elementName.equals("HCl25_K2O")) {
+                DataElements.setHCl25K2O(rp.elementValue);
+//                hclk2o = (Float.toString(DataElements.getHCl25K2O()));
+                myObj.setHclk2o(String.valueOf(rp.elementValue));
+            }
+            //
+            if (rp.elementName.equals("Bray1_P2O5")) {
+                DataElements.setBray1P2O5(rp.elementValue);
+//                bray = (Float.toString(DataElements.getBray1P2O5()));
+                myObj.setBray(String.valueOf(rp.elementValue));
+            }
+            //
+            if (rp.elementName.equals("Olsen_P2O5")) {
+                DataElements.setOlsenP2O5(rp.elementValue);
+//                olsen = (Float.toString(DataElements.getOlsenP2O5()));
+                myObj.setOlsen(String.valueOf(rp.elementValue));
+            }
+            //
+            if (rp.elementName.equals("Ca")) {
+                DataElements.setCa(rp.elementValue);
+//                ca = (Float.toString(DataElements.getCa()));
+                myObj.setCa(String.valueOf(rp.elementValue));
+            }
+            //
+            if (rp.elementName.equals("Mg")) {
+                DataElements.setMg(rp.elementValue);
+//                mg = (Float.toString(DataElements.getMg()));
+                myObj.setMg(String.valueOf(rp.elementValue));
+            }
+            //
+            if (rp.elementName.equals("K")) {
+                DataElements.setK(rp.elementValue);
+//                k = (Float.toString(DataElements.getK()));
+                myObj.setK(String.valueOf(rp.elementValue));
+            }
+            //
+            if (rp.elementName.equals("Na")) {
+                DataElements.setNa(rp.elementValue);
+//                na = (Float.toString(DataElements.getNa()));
+                myObj.setNa(String.valueOf(rp.elementValue));
+            }
+            //
+            if (rp.elementName.equals("KB_adjusted")) {
+                DataElements.setKBAdjusted(rp.elementValue);
+//                kbadj = (Float.toString(DataElements.getKBAdjusted()));
+                myObj.setKbadj(String.valueOf(rp.elementValue));
+            }
+            //
+            if (rp.elementName.equals("KTK")) {
+                DataElements.setKTK(rp.elementValue);
+//                ktk = (Float.toString(DataElements.getKTK()));
+                myObj.setKtk(String.valueOf(rp.elementValue));
+            }
+            //
+            if (rp.elementName.equals("SAND")) {
+                DataElements.setSAND(rp.elementValue);
+//                sand = (Float.toString(DataElements.getSAND()));
+                myObj.setSand(String.valueOf(rp.elementValue));
+            }
+            //
+            if (rp.elementName.equals("SILT")) {
+                DataElements.setSILT(rp.elementValue);
+//                silt = (Float.toString(DataElements.getSILT()));
+                myObj.setSilt(String.valueOf(rp.elementValue));
+            }
+            //
+            if (rp.elementName.equals("CLAY")) {
+                DataElements.setCLAY(rp.elementValue);
+//                clay = (Float.toString(DataElements.getCLAY()));
+                myObj.setClay(String.valueOf(rp.elementValue));
+            }
+            if (rp.elementName.equals("Jumlah")) {
+                DataElements.setJumlah(rp.elementValue);
+//                jumlah = (Float.toString(DataElements.getJumlah()));
+                myObj.setJumlah(String.valueOf(rp.elementValue));
+            }
+            if (rp.elementName.equals("Morgan_K2O")) {
+                DataElements.setMorganK2O(rp.elementValue);
+//                morgan = (Float.toString(DataElements.getMorganK2O()));
+                myObj.setMorgan(String.valueOf(rp.elementValue));
+            }
+            if (rp.elementName.equals("RetensiP")) {
+                DataElements.setRetensiP(rp.elementValue);
+//                retensip = (Float.toString(DataElements.getRetensiP()));
+                myObj.setRetensip(String.valueOf(rp.elementValue));
+            }
+            if (rp.elementName.equals("WBC")) {
+                DataElements.setWBC(rp.elementValue);
+//                wbc = (Float.toString(DataElements.getWBC()));
+                myObj.setWbc(String.valueOf(rp.elementValue));
+            }
+        }
+    }
+
     private void inputData() {
-
-
-
-        // get data
-        bray = "" + (Float.toString(DataElements.getBray1P2O5()));
-        ca = "" + (Float.toString(DataElements.getCa()));
-        clay = "" + (Float.toString(DataElements.getCLAY()));
-        cn = "" +(Float.toString(DataElements.getCN()));
-        hclk2o = "" + (Float.toString(DataElements.getHCl25K2O()));
-        hclp2o5 = "" + (Float.toString(DataElements.getHCl25P2O5()));
-        jumlah = "" + (Float.toString(DataElements.getJumlah()));
-        k = "" + (Float.toString(DataElements.getK()));
-        kbadj = "" + (Float.toString(DataElements.getKBAdjusted()));
-        kjelhal = "" + (Float.toString(DataElements.getKjeldahlN()));
-        ktk = "" + (Float.toString(DataElements.getKTK()));
-        mg = "" + (Float.toString(DataElements.getMg()));
-        morgan = "" + (Float.toString(DataElements.getMorganK2O()));
-        na = "" + (Float.toString(DataElements.getNa()));
-        olsen = "" + (Float.toString(DataElements.getOlsenP2O5()));
-        phh2o = "" + (Float.toString(DataElements.getPhH2o()));
-        phkcl = "" + (Float.toString(DataElements.getPhKcl()));
-        retensip = "" + (Float.toString(DataElements.getRetensiP()));
-        sand = "" + (Float.toString(DataElements.getSAND()));
-        silt = "" +(Float.toString(DataElements.getSILT()));
-        wbc = "" + (Float.toString(DataElements.getWBC()));
-
-
-
-
-
         //save to db
         Calendar calendar = Calendar.getInstance(TimeZone.getDefault());
         int tahun = calendar.get(Calendar.YEAR);
@@ -1102,50 +1224,31 @@ public class ScanPageFragment extends Fragment {
         int tanggal = calendar.get(Calendar.DAY_OF_MONTH);
         String timestamp = "" + tahun + "-" + bulan + "-" + tanggal;
 
-
         long id = dbHelper.insertRecord(
-                "" + bray,
-                "" + ca,
-                "" + clay,
-                "" + cn,
-                "" + hclk2o,
-                "" + hclp2o5,
-                "" + jumlah,
-                "" + k,
-                "" + kbadj,
-                "" + kjelhal,
-                "" + ktk,
-                "" + mg,
-                "" + morgan,
-                "" + na,
-                "" + olsen,
-                "" + phh2o,
-                "" + cn,
-                "" + phkcl,
-                "" + sand,
-                "" + silt,
-                "" + wbc,
+                "" + myObj.getBray(),
+                "" + myObj.getCa(),
+                "" + myObj.getClay(),
+                "" + myObj.getCn(),
+                "" + myObj.getHclk2o(),
+                "" + myObj.getHclp2o5(),
+                "" + myObj.getJumlah(),
+                "" + myObj.getK(),
+                "" + myObj.getKbadj(),
+                "" + myObj.getKjelhal(),
+                "" + myObj.getKtk(),
+                "" + myObj.getMg(),
+                "" + myObj.getMorgan(),
+                "" + myObj.getNa(),
+                "" + myObj.getOlsen(),
+                "" + myObj.getPhh2o(),
+                "" + myObj.getPhkcl(),
+                "" + myObj.getRetensip(),
+                "" + myObj.getSand(),
+                "" + myObj.getSilt(),
+                "" + myObj.getWbc(),
 
                 "" + timestamp
-
-
         );
-
-    }
-
-    public void setDataElement(ResultPrediction[] datas)
-    {
-        for (int i = 0; i < datas.length; i++)
-        {
-=======
-    public void setDataElement(ResultPrediction[] datas) {
-        for (int i = 0; i < datas.length; i++) {
->>>>>>> 8c8292a60ac4a93371b8866b6e37cefb32d00245
-            ResultPrediction rp = datas[i];
-            if (rp.elementName.equals("Bray1_P2O5")) {
-                DataElements.setBray1P2O5(rp.elementValue);
-            }
-        }
     }
 
     public static String[] getStrings(double[] a) {
@@ -1196,4 +1299,103 @@ public class ScanPageFragment extends Fragment {
         }
         return null;
     }
+
+    public void Calculator() {
+
+        Ini ini = null;
+        try {
+            InputStream inputStream = getContext().getAssets().open("config.ini");
+            ini = new Ini(inputStream);
+            java.util.prefs.Preferences prefs = new IniPreferences(ini);
+            //System.out.println("grumpy/homePage: " + prefs.node("grumpy").get("homePage", null));
+
+            String DataRekomendasi = ini.get("Config", "DataRekomendasi");
+            try {
+                double ureaConst = Double.parseDouble(ini.get("Config", "Urea"));
+                double sp36Const = Double.parseDouble(ini.get("Config", "SP36"));
+                double kclConst = Double.parseDouble(ini.get("Config", "KCL"));
+                FertilizerCalculator calc = new FertilizerCalculator(getContext());
+                String TxtUrea = String.valueOf(calc.GetFertilizerDoze(DataElements.getCN(), "Padi", "Urea") * ureaConst);
+                String TxtSP36 = String.valueOf(calc.GetFertilizerDoze(DataElements.getHCl25P2O5(), "Padi", "SP36") * sp36Const);
+                String TxtKCL = String.valueOf(calc.GetFertilizerDoze(DataElements.getHCl25K2O(), "Padi", "KCL") * kclConst);
+                System.out.println(String.format("Rekomendasi KCL : %1$s, SP36 : %2$s, Urea : %3$s", TxtKCL, TxtSP36, TxtUrea));
+
+                FertilizerInfo x = calc.GetNPKDoze(DataElements.getHCl25P2O5(), DataElements.getHCl25K2O(), "Padi");
+                float Urea = (x.getUrea());
+                float Npk = (x.getNPK());
+
+                System.out.println(String.format("Rekomendasi NPK 15:15:15 = %1$s", Npk));
+                System.out.println(String.format("UREA 15:15:15 = %1$s", Urea));
+
+                DataElements.setUrea(String.valueOf(calc.GetFertilizerDoze(DataElements.getCN(), "Padi", "Urea") * ureaConst));
+                DataElements.setSp36(String.valueOf(calc.GetFertilizerDoze(DataElements.getHCl25P2O5(), "Padi", "SP36") * sp36Const));
+                DataElements.setKcl(String.valueOf(calc.GetFertilizerDoze(DataElements.getHCl25K2O(), "Padi", "KCL") * kclConst));
+                DataElements.setNpk(Npk);
+                DataElements.setUrea15(Urea);
+
+            } catch (RuntimeException ex) {
+                System.out.println(ex);
+            }
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        /*
+        String filename = "SSK.Mobile\\SSK.Desktop\\src\\main\\java\\data\\config.ini";
+        Ini ini = null;
+        try {
+
+            ini = new Ini(new File(filename));
+            Preferences prefs = new IniPreferences(ini);
+            //System.out.println("grumpy/homePage: " + prefs.node("grumpy").get("homePage", null));
+
+            String DataRekomendasi = ini.get("Config","DataRekomendasi");
+            String WorkingDirectory = ini.get("Config","WorkingDirectory");
+            String ModelScript = ini.get("Config","ModelScript");
+            String SensorData = ini.get("Config","SensorData");
+            String AnacondaFolder = ini.get("Config","AnacondaFolder");
+            Resources.PathToData = ini.get("Config","PathToData");
+            double ureaConst = Double.parseDouble(ini.get("Config","Urea"));
+            double sp36Const = Double.parseDouble(ini.get("Config","SP36"));
+            double kclConst = Double.parseDouble(ini.get("Config","KCL"));
+
+            ModelRunner ml = new ModelRunner(WorkingDirectory, ModelScript, SensorData, AnacondaFolder);
+
+            InferenceResult hasil = ml.InferenceModel(false, true);
+            if (hasil.getIsSucceed())
+            {
+                try
+                {
+
+                    System.out.println("start recommendation process");
+                    FertilizerCalculator calc = new FertilizerCalculator(DataRekomendasi);
+                    String TxtUrea = String.valueOf(calc.GetFertilizerDoze(DataElements.getCN(), "Padi", "Urea")*ureaConst);
+                    String TxtSP36 = String.valueOf(calc.GetFertilizerDoze(DataElements.getHCl25P2O5(), "Padi", "SP36")*sp36Const);
+                    String TxtKCL = String.valueOf(calc.GetFertilizerDoze(DataElements.getHCl25K2O(), "Padi", "KCL")*kclConst);
+                    System.out.println(String.format("Rekomendasi KCL : %1$s, SP36 : %2$s, Urea : %3$s", TxtKCL, TxtSP36, TxtUrea));
+
+                    FertilizerInfo x = calc.GetNPKDoze(DataElements.getHCl25P2O5(), DataElements.getHCl25K2O(), "Padi");
+
+                    System.out.println(String.format("Rekomendasi NPK 15:15:15 = %1$s",x.getNPK()));
+                    System.out.println(String.format("UREA 15:15:15 = %1$s",x.getUrea()));
+
+                    DataElements.setUrea(String.valueOf(calc.GetFertilizerDoze(DataElements.getCN(), "Padi", "Urea")*ureaConst));
+                    DataElements.setSp36(String.valueOf(calc.GetFertilizerDoze(DataElements.getHCl25P2O5(), "Padi", "SP36")*sp36Const));
+                    DataElements.setKcl(String.valueOf(calc.GetFertilizerDoze(DataElements.getHCl25K2O(), "Padi", "KCL")*kclConst));
+                    DataElements.setNpk(String.valueOf(x.getNPK()));
+                    DataElements.setUrea15(String.valueOf(x.getUrea()));
+
+                }
+                catch (RuntimeException ex)
+                {
+                    System.out.println(ex);
+                }
+            }
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }*/
+    }
 }
+

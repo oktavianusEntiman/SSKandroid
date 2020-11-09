@@ -190,4 +190,52 @@ public class DataElements {
     {
         WBC = value;
     }
+
+    //rekomendasi object
+    private static String Urea;
+    private static String Sp36;
+    private static String Kcl;
+    private static float Npk;
+    private static float Urea15;
+
+    public static String getUrea() {
+        return Urea;
+    }
+
+    public static void setUrea(String urea) {
+        Urea = urea;
+    }
+
+    public static String getSp36() {
+        return Sp36;
+    }
+
+    public static void setSp36(String sp36) {
+        Sp36 = sp36;
+    }
+
+    public static String getKcl() {
+        return Kcl;
+    }
+
+    public static void setKcl(String kcl) {
+        Kcl = kcl;
+    }
+
+    public static float getNpk() {
+        return Npk;
+    }
+
+    public static void setNpk(float npk) {
+        Npk = npk;
+    }
+
+    public static float getUrea15() {
+        return Urea15;
+    }
+
+    public static void setUrea15(float urea15) {
+        Urea15 = urea15;
+    }
+
 }
